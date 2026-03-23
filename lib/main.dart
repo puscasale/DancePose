@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/welcome/welcome_screen.dart';
 import 'theme/app_colors.dart';
+import 'screens/login/login_screen.dart';
 
 void main() {
   runApp(const DancePoseApp());

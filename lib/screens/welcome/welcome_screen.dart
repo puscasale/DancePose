@@ -3,6 +3,7 @@ import '../../theme/app_colors.dart';
 import 'widgets/background_glow.dart';
 import 'widgets/mini_badge.dart';
 import 'widgets/skeleton_motion_graphic.dart';
+import '../login/login_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -180,7 +181,37 @@ class WelcomeScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () {
+  Navigator.of(context).push(
+  PageRouteBuilder(
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        const LoginScreen(),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final offsetAnimation = Tween<Offset>(
+        begin: const Offset(0.08, 0),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      );
+
+      final fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(
+        CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      );
+
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        ),
+      );
+    },
+  ),
+);
+},
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
                       side: BorderSide(
