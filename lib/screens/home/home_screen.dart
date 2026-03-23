@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
 import '../learning/learning_styles_screen.dart';
+import '../analysis/start_dance_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -277,7 +278,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Upload or record a video and get an instant performance report.',
                         icon: Icons.play_circle_fill_rounded,
                         accent: AppColors.primary,
-                        onTap: () {},
+                        onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const StartDanceScreen(),
+    ),
+  );
+},
                       ),
 
                       const SizedBox(height: 18),
