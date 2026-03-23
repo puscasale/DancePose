@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../login/login_screen.dart';
 import '../welcome/widgets/background_glow.dart';
-import '../signup/signup_screen.dart';
 
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class SignUpScreen extends StatelessWidget {
+  const SignUpScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +94,7 @@ class LoginScreen extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       const Text(
-                        'Welcome back',
+                        'Create account',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textPrimary,
@@ -106,7 +106,7 @@ class LoginScreen extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       const Text(
-                        'Log in to continue your progress.',
+                        'Start your journey with DancePose.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
@@ -137,6 +137,15 @@ class LoginScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const _InputLabel('Full name'),
+                            const SizedBox(height: 10),
+                            const _CustomInputField(
+                              hintText: 'Enter your full name',
+                              icon: Icons.person_outline_rounded,
+                            ),
+
+                            const SizedBox(height: 20),
+
                             const _InputLabel('Email'),
                             const SizedBox(height: 10),
                             const _CustomInputField(
@@ -149,35 +158,22 @@ class LoginScreen extends StatelessWidget {
                             const _InputLabel('Password'),
                             const SizedBox(height: 10),
                             const _CustomInputField(
-                              hintText: 'Enter your password',
+                              hintText: 'Create a password',
                               icon: Icons.lock_outline_rounded,
                               obscureText: true,
                             ),
 
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 20),
 
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {},
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.secondary,
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text(
-                                  'Forgot password?',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
+                            const _InputLabel('Confirm password'),
+                            const SizedBox(height: 10),
+                            const _CustomInputField(
+                              hintText: 'Confirm your password',
+                              icon: Icons.lock_outline_rounded,
+                              obscureText: true,
                             ),
 
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 22),
 
                             SizedBox(
                               width: double.infinity,
@@ -193,7 +189,7 @@ class LoginScreen extends StatelessWidget {
                                   ),
                                 ),
                                 child: const Text(
-                                  'Log In',
+                                  'Create Account',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -211,7 +207,7 @@ class LoginScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text(
-                            "Don't have an account? ",
+                            'Already have an account? ',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,
@@ -219,15 +215,15 @@ class LoginScreen extends StatelessWidget {
                           ),
                           GestureDetector(
                             onTap: () {
-                                Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SignUpScreen(),
-      ),
-    );
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                              );
                             },
                             child: const Text(
-                              'Sign Up',
+                              'Log In',
                               style: TextStyle(
                                 color: AppColors.secondary,
                                 fontSize: 14,

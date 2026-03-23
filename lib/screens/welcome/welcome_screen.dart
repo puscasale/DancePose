@@ -4,6 +4,7 @@ import 'widgets/background_glow.dart';
 import 'widgets/mini_badge.dart';
 import 'widgets/skeleton_motion_graphic.dart';
 import '../login/login_screen.dart';
+import '../signup/signup_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -155,38 +156,69 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 28),
 
                 SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.textPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: const Text(
-                      'Get Started',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
+  width: double.infinity,
+  child: ElevatedButton(
+    onPressed: () {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const SignUpScreen(),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+            final offsetAnimation = Tween<Offset>(
+              begin: const Offset(0.08, 0),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            );
+
+            final fadeAnimation = Tween<double>(
+              begin: 0.0,
+              end: 1.0,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            );
+
+            return FadeTransition(
+              opacity: fadeAnimation,
+              child: SlideTransition(
+                position: offsetAnimation,
+                child: child,
+              ),
+            );
+          },
+        ),
+      );
+    },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.textPrimary,
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+    ),
+    child: const Text(
+      'Get Started',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  ),
+),
 
                 const SizedBox(height: 14),
 
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {
-  Navigator.of(context).push(
-  PageRouteBuilder(
-    pageBuilder: (context, animation, secondaryAnimation) =>
-        const LoginScreen(),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    onPressed: () { 
+                      Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                          const LoginScreen(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final offsetAnimation = Tween<Offset>(
         begin: const Offset(0.08, 0),
         end: Offset.zero,
