@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
+import '../learning/learning_styles_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -258,7 +259,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Choose a style, pick a move, and practice step by step.',
                         icon: Icons.school_rounded,
                         accent: AppColors.secondary,
-                        onTap: () {},
+                        onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const LearningStylesScreen(),
+    ),
+  );
+},
                       ),
 
                       const SizedBox(height: 16),
