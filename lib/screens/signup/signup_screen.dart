@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../login/login_screen.dart';
 import '../welcome/widgets/background_glow.dart';
+import '../home/home_screen.dart';
 
 class SignUpScreen extends StatelessWidget {
   const SignUpScreen({super.key});
@@ -63,7 +64,7 @@ class SignUpScreen extends StatelessWidget {
                         child: Center(
                           child: ClipOval(
                             child: Image.asset(
-                              'assets/images/dancepose_logo.png',
+                              'assets/images/DancePose_logov3.png',
                               fit: BoxFit.cover,
                               width: 104,
                               height: 104,
@@ -178,7 +179,14 @@ class SignUpScreen extends StatelessWidget {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () {},
+                                onPressed: () {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const HomeScreen(),
+    ),
+  );
+},
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: AppColors.textPrimary,

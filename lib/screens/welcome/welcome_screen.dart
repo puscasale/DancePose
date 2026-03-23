@@ -48,7 +48,7 @@ class WelcomeScreen extends StatelessWidget {
                         child: Transform.scale(
   scale: 1.18,
   child: Image.asset(
-    'assets/images/dancepose_logo.png',
+    'assets/images/DancePose_logov3.png',
     fit: BoxFit.contain,
     errorBuilder: (context, error, stackTrace) {
       return const Icon(
