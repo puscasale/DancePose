@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_colors.dart';
+import '../../services/analysis_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'processing_screen.dart';
 
@@ -13,7 +14,48 @@ class StartDanceScreen extends StatefulWidget {
 
 class _StartDanceScreenState extends State<StartDanceScreen> {
   final ImagePicker _picker = ImagePicker();
+  final AnalysisService _analysisService = AnalysisService();
+
   bool _isBusy = false;
+
+  Future<void> _handlePickedVideo({
+    required XFile videoFile,
+    required String sourceType,
+    required String sourceLabel,
+  }) async {
+    try {
+      final session = await _analysisService.uploadAnalysisVideo(
+        mode: 'auto_detect',
+        sourceType: sourceType,
+        filePath: videoFile.path,
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProcessingScreen(
+            analysisSessionId: session.id,
+            styleName: 'Auto-detect mode',
+            stepName: 'Predicting move...',
+            sourceLabel: sourceLabel,
+            filePath: videoFile.path,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _pickFromGallery() async {
     if (_isBusy) return;
@@ -30,19 +72,13 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
       if (!mounted) return;
 
       if (pickedVideo != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProcessingScreen(
-              styleName: 'Auto-detect mode',
-              stepName: 'Predicting move...',
-              sourceLabel: 'Gallery upload',
-              filePath: pickedVideo.path,
-            ),
-          ),
+        await _handlePickedVideo(
+          videoFile: pickedVideo,
+          sourceType: 'gallery',
+          sourceLabel: 'Gallery upload',
         );
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -73,19 +109,13 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
       if (!mounted) return;
 
       if (recordedVideo != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProcessingScreen(
-              styleName: 'Auto-detect mode',
-              stepName: 'Predicting move...',
-              sourceLabel: 'Camera recording',
-              filePath: recordedVideo.path,
-            ),
-          ),
+        await _handlePickedVideo(
+          videoFile: recordedVideo,
+          sourceType: 'camera',
+          sourceLabel: 'Camera recording',
         );
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -165,9 +195,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 24),
-
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -229,20 +257,18 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 28),
-
                       _ActionCard(
                         title: 'Upload from Gallery',
                         subtitle:
                             'Choose an existing dance video from your phone.',
-                        icon: Icons.upload_rounded,
+                        icon: _isBusy
+                            ? Icons.hourglass_top_rounded
+                            : Icons.upload_rounded,
                         accent: AppColors.secondary,
                         onTap: _isBusy ? null : _pickFromGallery,
                       ),
-
                       const SizedBox(height: 18),
-
                       _ActionCard(
                         title: 'Record with Camera',
                         subtitle:
@@ -251,9 +277,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                         accent: AppColors.primary,
                         onTap: _isBusy ? null : _recordWithCamera,
                       ),
-
                       const SizedBox(height: 28),
-
                       const Text(
                         'How it works',
                         style: TextStyle(
@@ -262,9 +286,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       const _InfoCard(
                         icon: Icons.video_library_rounded,
                         text: 'Upload or record a full-body dance video.',
@@ -279,7 +301,6 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                         icon: Icons.psychology_rounded,
                         text: 'The system predicts the dance style and move automatically.',
                       ),
-
                       if (_isBusy) ...[
                         const SizedBox(height: 24),
                         const Center(
@@ -288,7 +309,6 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                           ),
                         ),
                       ],
-
                       const SizedBox(height: 24),
                     ],
                   ),

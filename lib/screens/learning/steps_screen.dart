@@ -1,24 +1,40 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../models/dance_move_model.dart';
+import '../../services/dance_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'step_detail_screen.dart';
 
-class StepsScreen extends StatelessWidget {
+class StepsScreen extends StatefulWidget {
+  final int styleId;
   final String styleName;
   final Color accentColor;
   final IconData styleIcon;
 
   const StepsScreen({
     super.key,
+    required this.styleId,
     required this.styleName,
     required this.accentColor,
     required this.styleIcon,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final steps = _getStepsForStyle(styleName);
+  State<StepsScreen> createState() => _StepsScreenState();
+}
 
+class _StepsScreenState extends State<StepsScreen> {
+  final DanceService _danceService = DanceService();
+  late Future<List<DanceMoveModel>> _movesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _movesFuture = _danceService.getMovesByStyle(widget.styleId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
@@ -59,7 +75,7 @@ class StepsScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  styleName,
+                                  widget.styleName,
                                   style: const TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 13,
@@ -79,9 +95,7 @@ class StepsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 24),
-
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -93,7 +107,7 @@ class StepsScreen extends StatelessWidget {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: accentColor.withValues(alpha: 0.10),
+                              color: widget.accentColor.withValues(alpha: 0.10),
                               blurRadius: 18,
                               spreadRadius: 1,
                               offset: const Offset(0, 8),
@@ -107,11 +121,12 @@ class StepsScreen extends StatelessWidget {
                               height: 64,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(18),
-                                color: accentColor.withValues(alpha: 0.14),
+                                color:
+                                    widget.accentColor.withValues(alpha: 0.14),
                               ),
                               child: Icon(
-                                styleIcon,
-                                color: accentColor,
+                                widget.styleIcon,
+                                color: widget.accentColor,
                                 size: 32,
                               ),
                             ),
@@ -121,7 +136,7 @@ class StepsScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    styleName,
+                                    widget.styleName,
                                     style: const TextStyle(
                                       color: AppColors.textPrimary,
                                       fontSize: 20,
@@ -143,34 +158,83 @@ class StepsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 28),
+                      FutureBuilder<List<DanceMoveModel>>(
+                        future: _movesFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 40),
+                                child: CircularProgressIndicator(
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            );
+                          }
 
-                      ...steps.asMap().entries.map(
-                        (entry) {
-                          final index = entry.key;
-                          final step = entry.value;
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 40),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Could not load dance moves.',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _movesFuture = _danceService
+                                              .getMovesByStyle(widget.styleId);
+                                        });
+                                      },
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 18),
-                            child: _StepCard(
-                              number: index + 1,
-                              title: step,
-                              accent: accentColor,
-                              onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => StepDetailsScreen(
-        styleName: styleName,
-        stepName: step,
-        accentColor: accentColor,
-        styleIcon: styleIcon,
-      ),
-    ),
-  );
-},
-                            ),
+                          final moves = snapshot.data ?? [];
+
+                          return Column(
+                            children: moves.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final move = entry.value;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 18),
+                                child: _StepCard(
+                                  number: index + 1,
+                                  title: move.name,
+                                  accent: widget.accentColor,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => StepDetailsScreen(
+                                          styleId: widget.styleId,
+                                          moveId: move.id,
+                                          styleName: widget.styleName,
+                                          stepName: move.name,
+                                          accentColor: widget.accentColor,
+                                          styleIcon: widget.styleIcon,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }).toList(),
                           );
                         },
                       ),
@@ -183,43 +247,6 @@ class StepsScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-List<String> _getStepsForStyle(String styleName) {
-  switch (styleName) {
-    case 'House':
-      return const [
-        'Side Kick',
-        'Sworl',
-        'Farmer',
-        'Shuffle',
-        'Heel Step',
-      ];
-    case 'Middle Hip-Hop':
-      return const [
-        'Rager Rabbit',
-        'Club',
-        'Brooklyn Bounce',
-        'Running Man',
-        'Popcorn',
-      ];
-    case 'Street Jazz':
-      return const [
-        'Positions des pieds',
-        'Plié',
-        'Jump',
-        'Passé Balance',
-        'Paddbre',
-      ];
-    default:
-      return const [
-        'Move 1',
-        'Move 2',
-        'Move 3',
-        'Move 4',
-        'Move 5',
-      ];
   }
 }
 
@@ -297,7 +324,6 @@ class _StepCard extends StatelessWidget {
     );
   }
 }
-
 
 class _NoStretchScrollBehavior extends ScrollBehavior {
   const _NoStretchScrollBehavior();

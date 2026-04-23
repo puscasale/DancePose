@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/welcome/welcome_screen.dart';
+import 'screens/auth/auth_gate_screen.dart';
 import 'theme/app_colors.dart';
-import 'screens/login/login_screen.dart';
 
 void main() {
   runApp(const DancePoseApp());
@@ -19,7 +18,7 @@ class DancePoseApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,
       ),
-      home: const WelcomeScreen(),
+      home: const AuthGateScreen(),
     );
   }
 }

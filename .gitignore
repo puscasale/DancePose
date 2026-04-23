@@ -1,3 +1,14 @@
+backend/.env
+backend/uploads/
+backend/venv/
+__pycache__/
+
+assets/videos/house/
+assets/videos/middle_hip_hop/
+assets/videos/street_jazz/
+assets/videos/featured_move.mp4
+assets/videos/gHO_sBM_c01_d19_mHO0_ch04.mov
+
 # Miscellaneous
 *.class
 *.log

@@ -7,6 +7,8 @@ from app.routes.styles import router as styles_router
 from app.routes.moves import router as moves_router
 from app.routes.analysis import router as analysis_router
 from app.routes.results import router as results_router
+from app.routes.profile import router as profile_router
+from app.routes.progress import router as progress_router
 from app.seed_data import seed_database
 
 Base.metadata.create_all(bind=engine)
@@ -24,6 +26,8 @@ app.include_router(styles_router)
 app.include_router(moves_router)
 app.include_router(analysis_router)
 app.include_router(results_router)
+app.include_router(profile_router)
+app.include_router(progress_router)
 
 
 @app.get("/")

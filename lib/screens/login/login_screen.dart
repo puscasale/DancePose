@@ -1,11 +1,86 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../models/auth/login_request.dart';
+import '../../services/auth_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import '../signup/signup_screen.dart';
-import '../home/home_screen.dart';
+import '../navigation/main_navigation_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
+
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('Please complete all fields.');
+      return;
+    }
+
+    if (!email.contains('@')) {
+      _showMessage('Please enter a valid email address.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _authService.login(
+        LoginRequest(
+          email: email,
+          password: password,
+        ),
+      );
+
+      await _authService.getCurrentUser();
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MainNavigationScreen(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +101,11 @@ class LoginScreen extends StatelessWidget {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  Navigator.pop(context);
+                                },
                           style: IconButton.styleFrom(
                             backgroundColor:
                                 AppColors.surface.withValues(alpha: 0.75),
@@ -44,9 +121,7 @@ class LoginScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       Container(
                         width: 112,
                         height: 112,
@@ -79,9 +154,7 @@ class LoginScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 18),
-
                       const Text(
                         'DancePose',
                         style: TextStyle(
@@ -91,9 +164,7 @@ class LoginScreen extends StatelessWidget {
                           letterSpacing: 0.3,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       const Text(
                         'Welcome back',
                         textAlign: TextAlign.center,
@@ -103,9 +174,7 @@ class LoginScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       const Text(
                         'Log in to continue your progress.',
                         textAlign: TextAlign.center,
@@ -115,9 +184,7 @@ class LoginScreen extends StatelessWidget {
                           height: 1.5,
                         ),
                       ),
-
                       const SizedBox(height: 32),
-
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(22),
@@ -140,23 +207,22 @@ class LoginScreen extends StatelessWidget {
                           children: [
                             const _InputLabel('Email'),
                             const SizedBox(height: 10),
-                            const _CustomInputField(
+                            _CustomInputField(
+                              controller: _emailController,
                               hintText: 'Enter your email',
                               icon: Icons.mail_outline_rounded,
+                              keyboardType: TextInputType.emailAddress,
                             ),
-
                             const SizedBox(height: 20),
-
                             const _InputLabel('Password'),
                             const SizedBox(height: 10),
-                            const _CustomInputField(
+                            _CustomInputField(
+                              controller: _passwordController,
                               hintText: 'Enter your password',
                               icon: Icons.lock_outline_rounded,
                               obscureText: true,
                             ),
-
                             const SizedBox(height: 14),
-
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
@@ -177,44 +243,44 @@ class LoginScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 18),
-
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const HomeScreen(),
-    ),
-  );
-},
+                                onPressed: _isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: AppColors.textPrimary,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 18),
+                                  disabledBackgroundColor:
+                                      AppColors.primary.withValues(alpha: 0.55),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 18),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Log In',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.4,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Log In',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 26),
-
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -226,14 +292,17 @@ class LoginScreen extends StatelessWidget {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () {
-                                Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SignUpScreen(),
-      ),
-    );
-                            },
+                            onTap: _isLoading
+                                ? null
+                                : () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const SignUpScreen(),
+                                      ),
+                                    );
+                                  },
                             child: const Text(
                               'Sign Up',
                               style: TextStyle(
@@ -245,7 +314,6 @@ class LoginScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 20),
                     ],
                   ),
@@ -278,20 +346,26 @@ class _InputLabel extends StatelessWidget {
 }
 
 class _CustomInputField extends StatelessWidget {
+  final TextEditingController controller;
   final String hintText;
   final IconData icon;
   final bool obscureText;
+  final TextInputType keyboardType;
 
   const _CustomInputField({
+    required this.controller,
     required this.hintText,
     required this.icon,
     this.obscureText = false,
+    this.keyboardType = TextInputType.text,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
+      keyboardType: keyboardType,
       style: const TextStyle(
         color: AppColors.textPrimary,
         fontSize: 15,

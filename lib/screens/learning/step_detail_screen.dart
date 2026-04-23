@@ -3,10 +3,13 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_colors.dart';
+import '../../services/analysis_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import '../analysis/processing_screen.dart';
 
 class StepDetailsScreen extends StatefulWidget {
+  final int styleId;
+  final int moveId;
   final String styleName;
   final String stepName;
   final Color accentColor;
@@ -14,6 +17,8 @@ class StepDetailsScreen extends StatefulWidget {
 
   const StepDetailsScreen({
     super.key,
+    required this.styleId,
+    required this.moveId,
     required this.styleName,
     required this.stepName,
     required this.accentColor,
@@ -28,7 +33,9 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
   late final VideoPlayerController _videoController;
   ChewieController? _chewieController;
   final ImagePicker _picker = ImagePicker();
-  bool _isPickingVideo = false;
+  final AnalysisService _analysisService = AnalysisService();
+
+  bool _isBusy = false;
 
   @override
   void initState() {
@@ -164,11 +171,52 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
     return 'Focus on rhythm, body control, and clean timing. Start slowly, then repeat until the movement feels natural.';
   }
 
+  Future<void> _handlePickedVideo({
+    required XFile videoFile,
+    required String sourceType,
+    required String sourceLabel,
+  }) async {
+    try {
+      final session = await _analysisService.uploadAnalysisVideo(
+        mode: 'learning',
+        sourceType: sourceType,
+        filePath: videoFile.path,
+        selectedStyleId: widget.styleId,
+        selectedMoveId: widget.moveId,
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProcessingScreen(
+            analysisSessionId: session.id,
+            styleName: widget.styleName,
+            stepName: widget.stepName,
+            sourceLabel: sourceLabel,
+            filePath: videoFile.path,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _pickVideoFromGallery() async {
-    if (_isPickingVideo) return;
+    if (_isBusy) return;
 
     setState(() {
-      _isPickingVideo = true;
+      _isBusy = true;
     });
 
     try {
@@ -179,19 +227,13 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
       if (!mounted) return;
 
       if (pickedVideo != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProcessingScreen(
-              styleName: widget.styleName,
-              stepName: widget.stepName,
-              sourceLabel: 'Gallery upload',
-              filePath: pickedVideo.path,
-            ),
-          ),
+        await _handlePickedVideo(
+          videoFile: pickedVideo,
+          sourceType: 'gallery',
+          sourceLabel: 'Gallery upload',
         );
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,17 +244,17 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isPickingVideo = false;
+          _isBusy = false;
         });
       }
     }
   }
 
   Future<void> _recordVideoWithCamera() async {
-    if (_isPickingVideo) return;
+    if (_isBusy) return;
 
     setState(() {
-      _isPickingVideo = true;
+      _isBusy = true;
     });
 
     try {
@@ -223,19 +265,13 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
       if (!mounted) return;
 
       if (recordedVideo != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProcessingScreen(
-              styleName: widget.styleName,
-              stepName: widget.stepName,
-              sourceLabel: 'Camera recording',
-              filePath: recordedVideo.path,
-            ),
-          ),
+        await _handlePickedVideo(
+          videoFile: recordedVideo,
+          sourceType: 'camera',
+          sourceLabel: 'Camera recording',
         );
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -246,7 +282,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isPickingVideo = false;
+          _isBusy = false;
         });
       }
     }
@@ -271,9 +307,11 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                       Row(
                         children: [
                           IconButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
+                            onPressed: _isBusy
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                  },
                             style: IconButton.styleFrom(
                               backgroundColor:
                                   AppColors.surface.withValues(alpha: 0.78),
@@ -314,9 +352,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 22),
-
                       Row(
                         children: [
                           _MiniTag(
@@ -335,9 +371,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 22),
-
                       ClipRRect(
                         borderRadius: BorderRadius.circular(26),
                         child: AspectRatio(
@@ -355,9 +389,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                                 ),
                         ),
                       ),
-
                       const SizedBox(height: 22),
-
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -415,9 +447,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 22),
-
                       Row(
                         children: [
                           Expanded(
@@ -489,16 +519,22 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 28),
-
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed:
-                              _isPickingVideo ? null : _pickVideoFromGallery,
-                          icon: const Icon(Icons.upload_rounded),
-                          label: const Text('Upload Video'),
+                          onPressed: _isBusy ? null : _pickVideoFromGallery,
+                          icon: _isBusy
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                )
+                              : const Icon(Icons.upload_rounded),
+                          label: Text(_isBusy ? 'Uploading...' : 'Upload Video'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: widget.accentColor,
                             foregroundColor: AppColors.textPrimary,
@@ -509,14 +545,11 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isPickingVideo ? null : _recordVideoWithCamera,
+                          onPressed: _isBusy ? null : _recordVideoWithCamera,
                           icon: const Icon(Icons.videocam_rounded),
                           label: const Text('Record Now'),
                           style: OutlinedButton.styleFrom(
@@ -533,7 +566,6 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
                     ],
                   ),

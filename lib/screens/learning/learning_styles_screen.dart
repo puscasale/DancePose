@@ -1,10 +1,52 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../models/dance_style_model.dart';
+import '../../services/dance_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'steps_screen.dart';
 
-class LearningStylesScreen extends StatelessWidget {
+class LearningStylesScreen extends StatefulWidget {
   const LearningStylesScreen({super.key});
+
+  @override
+  State<LearningStylesScreen> createState() => _LearningStylesScreenState();
+}
+
+class _LearningStylesScreenState extends State<LearningStylesScreen> {
+  final DanceService _danceService = DanceService();
+  late Future<List<DanceStyleModel>> _stylesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _stylesFuture = _danceService.getStyles();
+  }
+
+  Color _getAccentColor(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return AppColors.secondary;
+      case 'Middle Hip-Hop':
+        return AppColors.primary;
+      case 'Street Jazz':
+        return AppColors.highlight;
+      default:
+        return AppColors.secondary;
+    }
+  }
+
+  IconData _getStyleIcon(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return Icons.graphic_eq_rounded;
+      case 'Middle Hip-Hop':
+        return Icons.bolt_rounded;
+      case 'Street Jazz':
+        return Icons.auto_awesome_rounded;
+      default:
+        return Icons.music_note_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,9 +110,7 @@ class LearningStylesScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 28),
-
                       const Text(
                         'Pick a dance style and start learning step by step with guided practice and AI-powered feedback.',
                         style: TextStyle(
@@ -79,77 +119,87 @@ class LearningStylesScreen extends StatelessWidget {
                           height: 1.55,
                         ),
                       ),
-
                       const SizedBox(height: 34),
+                      FutureBuilder<List<DanceStyleModel>>(
+                        future: _stylesFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 40),
+                                child: CircularProgressIndicator(
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            );
+                          }
 
-                      _StyleCard(
-                        title: 'House',
-                        subtitle:
-                            'Groove-based movement focused on rhythm, bounce, and flow.',
-                        accent: AppColors.secondary,
-                        icon: Icons.graphic_eq_rounded,
-                        difficulty: '5 moves',
-                        onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const StepsScreen(
-        styleName: 'House',
-        accentColor: AppColors.secondary,
-        styleIcon: Icons.graphic_eq_rounded,
-      ),
-    ),
-  );
-},
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 40),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Could not load dance styles.',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _stylesFuture =
+                                              _danceService.getStyles();
+                                        });
+                                      },
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          final styles = snapshot.data ?? [];
+
+                          return Column(
+                            children: styles.map((style) {
+                              final accent = _getAccentColor(style.name);
+                              final icon = _getStyleIcon(style.name);
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 22),
+                                child: _StyleCard(
+                                  title: style.name,
+                                  subtitle: style.description ??
+                                      'Start learning this style step by step.',
+                                  accent: accent,
+                                  icon: icon,
+                                  difficulty: '5 moves',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => StepsScreen(
+                                          styleId: style.id,
+                                          styleName: style.name,
+                                          accentColor: accent,
+                                          styleIcon: icon,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
                       ),
-
-                      const SizedBox(height: 22),
-
-                      _StyleCard(
-                        title: 'Middle Hip-Hop',
-                        subtitle:
-                            'Sharp, grounded, and musical moves with strong control.',
-                        accent: AppColors.primary,
-                        icon: Icons.bolt_rounded,
-                        difficulty: '5 moves',
-                        onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const StepsScreen(
-        styleName: 'Middle Hip-Hop',
-        accentColor: AppColors.primary,
-        styleIcon: Icons.bolt_rounded,
-      ),
-    ),
-  );
-},
-                      ),
-
-                      const SizedBox(height: 22),
-
-                      _StyleCard(
-                        title: 'Street Jazz',
-                        subtitle:
-                            'Expressive, stylish movement with attitude and clean lines.',
-                        accent: AppColors.highlight,
-                        icon: Icons.auto_awesome_rounded,
-                        difficulty: '5 moves',
-                        onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const StepsScreen(
-        styleName: 'Street Jazz',
-        accentColor: AppColors.highlight,
-        styleIcon: Icons.auto_awesome_rounded,
-      ),
-    ),
-  );
-},
-                      ),
-
-                     
                     ],
                   ),
                 ),

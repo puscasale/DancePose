@@ -3,8 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
+import 'result_screen.dart';
 
 class ProcessingScreen extends StatefulWidget {
+  final int analysisSessionId;
   final String styleName;
   final String stepName;
   final String sourceLabel;
@@ -12,6 +14,7 @@ class ProcessingScreen extends StatefulWidget {
 
   const ProcessingScreen({
     super.key,
+    required this.analysisSessionId,
     required this.styleName,
     required this.stepName,
     required this.sourceLabel,
@@ -27,6 +30,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   late final AnimationController _pulseController;
   late final AnimationController _scanController;
   Timer? _statusTimer;
+  Timer? _navigationTimer;
   int _statusIndex = 0;
 
   final List<String> _statuses = const [
@@ -56,11 +60,26 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         _statusIndex = (_statusIndex + 1) % _statuses.length;
       });
     });
+
+    _navigationTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultScreen(
+            analysisSessionId: widget.analysisSessionId,
+            styleName: widget.styleName,
+            stepName: widget.stepName,
+          ),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
     _statusTimer?.cancel();
+    _navigationTimer?.cancel();
     _pulseController.dispose();
     _scanController.dispose();
     super.dispose();
@@ -219,23 +238,23 @@ class _ProcessingSkeletonPainter extends CustomPainter {
     canvas.drawCircle(center, 54 * pulseWave, secondaryGlowPaint);
 
     final points = <Offset>[
-      Offset(center.dx - 22, center.dy - 95), // 0
-      Offset(center.dx - 8, center.dy - 108), // 1
-      Offset(center.dx + 8, center.dy - 95), // 2
-      Offset(center.dx + 22, center.dy - 108), // 3
-      Offset(center.dx + 38, center.dy - 95), // 4
-      Offset(center.dx - 56, center.dy - 46), // 5
-      Offset(center.dx + 56, center.dy - 46), // 6
-      Offset(center.dx - 70, center.dy + 2), // 7
-      Offset(center.dx + 70, center.dy + 2), // 8
-      Offset(center.dx - 64, center.dy + 58), // 9
-      Offset(center.dx + 64, center.dy + 58), // 10
-      Offset(center.dx - 26, center.dy + 24), // 11
-      Offset(center.dx + 26, center.dy + 24), // 12
-      Offset(center.dx - 18, center.dy + 92), // 13
-      Offset(center.dx + 18, center.dy + 92), // 14
-      Offset(center.dx - 24, center.dy + 158), // 15
-      Offset(center.dx + 24, center.dy + 158), // 16
+      Offset(center.dx - 22, center.dy - 95),
+      Offset(center.dx - 8, center.dy - 108),
+      Offset(center.dx + 8, center.dy - 95),
+      Offset(center.dx + 22, center.dy - 108),
+      Offset(center.dx + 38, center.dy - 95),
+      Offset(center.dx - 56, center.dy - 46),
+      Offset(center.dx + 56, center.dy - 46),
+      Offset(center.dx - 70, center.dy + 2),
+      Offset(center.dx + 70, center.dy + 2),
+      Offset(center.dx - 64, center.dy + 58),
+      Offset(center.dx + 64, center.dy + 58),
+      Offset(center.dx - 26, center.dy + 24),
+      Offset(center.dx + 26, center.dy + 24),
+      Offset(center.dx - 18, center.dy + 92),
+      Offset(center.dx + 18, center.dy + 92),
+      Offset(center.dx - 24, center.dy + 158),
+      Offset(center.dx + 24, center.dy + 158),
     ];
 
     final connections = <List<int>>[
@@ -292,8 +311,7 @@ class _ProcessingSkeletonPainter extends CustomPainter {
       ..color = AppColors.highlight.withValues(alpha: 0.28)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
-    final pointPaint = Paint()
-      ..color = AppColors.highlight;
+    final pointPaint = Paint()..color = AppColors.highlight;
 
     for (int i = 0; i < visiblePoints; i++) {
       canvas.drawCircle(points[i], 9 * pulseWave, pointGlowPaint);
