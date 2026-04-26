@@ -6,7 +6,6 @@ import '../welcome/welcome_screen.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
-import 'delete_account_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isLoading = true;
   bool _isLoggingOut = false;
+  bool _isDeleting = false;
   UserModel? _user;
 
   @override
@@ -104,6 +104,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _showDeleteAccountDialog() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Delete account?',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          content: const Text(
+            'This action is permanent. Your account and analysis history will be removed.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.highlight,
+                foregroundColor: AppColors.textPrimary,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await _handleDeleteAccount();
+    }
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    if (_isDeleting) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await _authService.deleteAccount();
+
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const WelcomeScreen(),
+        ),
+        (route) => false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete account. Please try again.'),
+        ),
+      );
+
+      setState(() {
+        _isDeleting = false;
+      });
+    }
+  }
+
   String _getInitials() {
     final fullName = _user?.fullName.trim() ?? '';
     if (fullName.isEmpty) return 'DP';
@@ -113,6 +193,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (parts.length == 1) return parts.first[0].toUpperCase();
 
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  String _formatDanceLevel(String? level) {
+    if (level == null || level.isEmpty) return 'Not set';
+
+    switch (level) {
+      case 'beginner':
+        return 'Beginner';
+      case 'intermediate':
+        return 'Intermediate';
+      case 'advanced':
+        return 'Advanced';
+      default:
+        return level;
+    }
   }
 
   @override
@@ -224,60 +319,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ),
                                   ),
-
                                   const SizedBox(height: 12),
-SizedBox(
-  width: double.infinity,
-  child: OutlinedButton.icon(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ChangePasswordScreen(),
-        ),
-      );
-    },
-    icon: const Icon(Icons.lock_reset_rounded),
-    label: const Text('Change Password'),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: AppColors.textPrimary,
-      side: BorderSide(
-        color: Colors.white.withValues(alpha: 0.14),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-    ),
-  ),
-),
-
-const SizedBox(height: 12),
-SizedBox(
-  width: double.infinity,
-  child: OutlinedButton.icon(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const DeleteAccountScreen(),
-        ),
-      );
-    },
-    icon: const Icon(Icons.delete_outline_rounded),
-    label: const Text('Delete Account'),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: AppColors.highlight,
-      side: BorderSide(
-        color: AppColors.highlight.withValues(alpha: 0.35),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-    ),
-  ),
-),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const ChangePasswordScreen(),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.lock_reset_rounded),
+                                      label: const Text('Change Password'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.textPrimary,
+                                        side: BorderSide(
+                                          color: Colors.white.withValues(alpha: 0.14),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(18),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isDeleting
+                                          ? null
+                                          : _showDeleteAccountDialog,
+                                      icon: _isDeleting
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: AppColors.highlight,
+                                              ),
+                                            )
+                                          : const Icon(Icons.delete_outline_rounded),
+                                      label: Text(
+                                        _isDeleting
+                                            ? 'Deleting account...'
+                                            : 'Delete Account',
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.highlight,
+                                        side: BorderSide(
+                                          color: AppColors.highlight
+                                              .withValues(alpha: 0.35),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(18),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -295,29 +402,19 @@ SizedBox(
                               title: 'Email',
                               value: _user?.email ?? 'Not available',
                             ),
-                            const SizedBox(height: 22),
-                            const _SectionTitle('Insights'),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: const [
-                                Expanded(
-                                  child: _MiniStatCard(
-                                    title: 'Sessions',
-                                    value: '12',
-                                    accent: AppColors.primary,
-                                    icon: Icons.local_fire_department_rounded,
-                                  ),
-                                ),
-                                SizedBox(width: 14),
-                                Expanded(
-                                  child: _MiniStatCard(
-                                    title: 'Best style',
-                                    value: 'House',
-                                    accent: AppColors.secondary,
-                                    icon: Icons.graphic_eq_rounded,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 12),
+                            _InfoTile(
+                              icon: Icons.cake_outlined,
+                              title: 'Age',
+                              value: _user?.age != null
+                                  ? '${_user!.age}'
+                                  : 'Not set',
+                            ),
+                            const SizedBox(height: 12),
+                            _InfoTile(
+                              icon: Icons.auto_awesome_rounded,
+                              title: 'Dance level',
+                              value: _formatDanceLevel(_user?.danceLevel),
                             ),
                             const SizedBox(height: 24),
                             SizedBox(
@@ -478,69 +575,6 @@ class _InfoTile extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniStatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final Color accent;
-  final IconData icon;
-
-  const _MiniStatCard({
-    required this.title,
-    required this.value,
-    required this.accent,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: accent.withValues(alpha: 0.14),
-            ),
-            child: Icon(
-              icon,
-              color: accent,
-              size: 22,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
             ),
           ),
         ],

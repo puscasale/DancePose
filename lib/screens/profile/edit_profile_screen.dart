@@ -20,23 +20,37 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final AuthService _authService = AuthService();
   late final TextEditingController _fullNameController;
+  late final TextEditingController _ageController;
 
   bool _isSaving = false;
+  String? _selectedDanceLevel;
+
+  final List<Map<String, String>> _danceLevels = const [
+    {'value': 'beginner', 'label': 'Beginner'},
+    {'value': 'intermediate', 'label': 'Intermediate'},
+    {'value': 'advanced', 'label': 'Advanced'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _fullNameController = TextEditingController(text: widget.user.fullName);
+    _ageController = TextEditingController(
+      text: widget.user.age != null ? '${widget.user.age}' : '',
+    );
+    _selectedDanceLevel = widget.user.danceLevel;
   }
 
   @override
   void dispose() {
     _fullNameController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     final fullName = _fullNameController.text.trim();
+    final ageText = _ageController.text.trim();
 
     if (fullName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,13 +61,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
+    int? parsedAge;
+    if (ageText.isNotEmpty) {
+      parsedAge = int.tryParse(ageText);
+      if (parsedAge == null || parsedAge < 1 || parsedAge > 120) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid age.'),
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _isSaving = true;
     });
 
     try {
       final updatedUser = await _authService.updateProfile(
-        UpdateProfileRequest(fullName: fullName),
+        UpdateProfileRequest(
+          fullName: fullName,
+          age: parsedAge,
+          danceLevel: _selectedDanceLevel,
+        ),
       );
 
       if (!mounted) return;
@@ -74,6 +105,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     }
+  }
+
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 14,
+      ),
+      prefixIcon: Icon(
+        icon,
+        color: AppColors.secondary,
+        size: 20,
+      ),
+      filled: true,
+      fillColor: const Color(0xFF0E1528),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(
+          color: AppColors.primary,
+          width: 1.4,
+        ),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+    );
   }
 
   @override
@@ -150,34 +221,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             color: AppColors.textPrimary,
                             fontSize: 15,
                           ),
-                          decoration: InputDecoration(
+                          decoration: _inputDecoration(
                             hintText: 'Enter your full name',
-                            hintStyle: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.person_outline_rounded,
-                              color: AppColors.secondary,
-                              size: 20,
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFF0E1528),
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 18),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.08),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: const BorderSide(
-                                color: AppColors.primary,
-                                width: 1.4,
-                              ),
-                            ),
+                            icon: Icons.person_outline_rounded,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -197,21 +243,79 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             color: AppColors.textSecondary,
                             fontSize: 15,
                           ),
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(
-                              Icons.mail_outline_rounded,
-                              color: AppColors.textSecondary,
-                              size: 20,
+                          decoration: _inputDecoration(
+                            hintText: '',
+                            icon: Icons.mail_outline_rounded,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Age',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                          decoration: _inputDecoration(
+                            hintText: 'Enter your age',
+                            icon: Icons.cake_outlined,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Dance level',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0E1528),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
                             ),
-                            filled: true,
-                            fillColor: const Color(0xFF0E1528),
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 18),
-                            disabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedDanceLevel,
+                              dropdownColor: AppColors.surface,
+                              hint: const Text(
+                                'Select your level',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
+                              iconEnabledColor: AppColors.textSecondary,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                              ),
+                              items: _danceLevels.map((level) {
+                                return DropdownMenuItem<String>(
+                                  value: level['value'],
+                                  child: Text(level['label']!),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedDanceLevel = value;
+                                });
+                              },
                             ),
                           ),
                         ),

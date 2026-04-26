@@ -18,7 +18,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   late Future<List<ProgressHistoryItem>> _historyFuture;
 
   String _selectedFilter = 'All';
-  String? _selectedStyle;
+  String _selectedStyle = 'All styles';
 
   @override
   void initState() {
@@ -37,19 +37,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
             item.createdAt.month == now.month &&
             item.createdAt.day == now.day;
       }).toList();
-    }
-
-    if (_selectedFilter == 'Week') {
+    } else if (_selectedFilter == 'Week') {
       final weekAgo = now.subtract(const Duration(days: 7));
       filtered = filtered.where((item) {
         return item.createdAt.isAfter(weekAgo);
       }).toList();
     }
 
-    if (_selectedStyle != null && _selectedStyle != 'All styles') {
+    if (_selectedStyle != 'All styles') {
       filtered = filtered.where((item) => item.styleName == _selectedStyle).toList();
     }
 
+    filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return filtered;
   }
 
@@ -68,7 +67,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final Map<String, List<double>> styleScores = {};
 
     for (final item in items) {
-      if (item.styleName != null && item.overallScore != null) {
+      if (item.styleName != null && item.styleName!.trim().isNotEmpty && item.overallScore != null) {
         styleScores.putIfAbsent(item.styleName!, () => []);
         styleScores[item.styleName!]!.add(item.overallScore!);
       }
@@ -150,6 +149,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return weekdays[date.weekday - 1];
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _historyFuture = _progressService.getHistory();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -185,11 +190,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _historyFuture = _progressService.getHistory();
-                              });
-                            },
+                            onPressed: _refresh,
                             child: const Text('Retry'),
                           ),
                         ],
@@ -201,13 +202,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 final allItems = snapshot.data ?? [];
                 final filteredItems = _applyFilters(allItems);
 
-                final styles = <String>{
-                  'All styles',
-                  ...allItems
-                      .map((e) => e.styleName)
-                      .where((e) => e != null)
-                      .cast<String>(),
-                }.toList();
+                final styleSet = allItems
+                    .map((e) => e.styleName)
+                    .where((e) => e != null && e!.trim().isNotEmpty)
+                    .cast<String>()
+                    .toSet()
+                    .toList()
+                  ..sort();
+
+                final styles = ['All styles', ...styleSet];
+
+                if (!styles.contains(_selectedStyle)) {
+                  _selectedStyle = 'All styles';
+                }
 
                 final avgScore = _averageScore(filteredItems);
                 final bestStyle = _bestStyle(filteredItems);
@@ -215,380 +222,378 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 final weeklySpots = _buildWeeklySpots(filteredItems);
                 final insight = _weeklyInsight(filteredItems);
 
-                return ScrollConfiguration(
-                  behavior: const _NoStretchScrollBehavior(),
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Progress',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
+                return RefreshIndicator(
+                  color: AppColors.secondary,
+                  onRefresh: _refresh,
+                  child: ScrollConfiguration(
+                    behavior: const _NoStretchScrollBehavior(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Progress',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Track your sessions, scores, and weekly growth.',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 15,
-                              height: 1.5,
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Track your sessions, scores, and weekly growth.',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 15,
+                                height: 1.5,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: ['All', 'Today', 'Week'].map((filter) {
-                              final selected = _selectedFilter == filter;
-                              return ChoiceChip(
-                                label: Text(filter),
-                                selected: selected,
-                                onSelected: (_) {
-                                  setState(() {
-                                    _selectedFilter = filter;
-                                  });
-                                },
-                                selectedColor:
-                                    AppColors.primary.withValues(alpha: 0.18),
-                                backgroundColor:
-                                    AppColors.surface.withValues(alpha: 0.85),
-                                labelStyle: TextStyle(
-                                  color: selected
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                side: BorderSide(
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: ['All', 'Today', 'Week'].map((filter) {
+                                final selected = _selectedFilter == filter;
+                                return ChoiceChip(
+                                  label: Text(filter),
+                                  selected: selected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _selectedFilter = filter;
+                                    });
+                                  },
+                                  selectedColor:
+                                      AppColors.primary.withValues(alpha: 0.18),
+                                  backgroundColor:
+                                      AppColors.surface.withValues(alpha: 0.85),
+                                  labelStyle: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.08),
                                 ),
-                              );
-                            }).toList(),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.94),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
                               ),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedStyle ?? 'All styles',
-                                dropdownColor: AppColors.surface,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                ),
-                                items: styles.map((style) {
-                                  return DropdownMenuItem(
-                                    value: style,
-                                    child: Text(style),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedStyle = value;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _SummaryCard(
-                                  title: 'Avg Score',
-                                  value: avgScore == 0
-                                      ? '-'
-                                      : avgScore.toStringAsFixed(1),
-                                  subtitle: 'Selected range',
-                                  icon: Icons.star_rounded,
-                                  accent: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _SummaryCard(
-                                  title: 'Sessions',
-                                  value: filteredItems.length.toString(),
-                                  subtitle: 'Selected range',
-                                  icon: Icons.local_fire_department_rounded,
-                                  accent: AppColors.secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _SummaryCard(
-                                  title: 'Best Style',
-                                  value: bestStyle,
-                                  subtitle: 'Top performer',
-                                  icon: Icons.music_note_rounded,
-                                  accent: AppColors.highlight,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _SummaryCard(
-                                  title: 'Consistency',
-                                  value: '$activeDays',
-                                  subtitle: 'Active days',
-                                  icon: Icons.insights_rounded,
-                                  accent: AppColors.secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.94),
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Weekly score trend',
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Your average performance over the last 7 days.',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    height: 1.45,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                SizedBox(
-                                  height: 220,
-                                  child: LineChart(
-                                    LineChartData(
-                                      minY: 0,
-                                      maxY: 10,
-                                      gridData: FlGridData(
-                                        show: true,
-                                        drawVerticalLine: false,
-                                        horizontalInterval: 2,
-                                        getDrawingHorizontalLine: (_) => FlLine(
-                                          color:
-                                              Colors.white.withValues(alpha: 0.06),
-                                          strokeWidth: 1,
-                                        ),
-                                      ),
-                                      borderData: FlBorderData(show: false),
-                                      titlesData: FlTitlesData(
-                                        topTitles: const AxisTitles(
-                                          sideTitles:
-                                              SideTitles(showTitles: false),
-                                        ),
-                                        rightTitles: const AxisTitles(
-                                          sideTitles:
-                                              SideTitles(showTitles: false),
-                                        ),
-                                        leftTitles: AxisTitles(
-                                          sideTitles: SideTitles(
-                                            showTitles: true,
-                                            interval: 2,
-                                            reservedSize: 30,
-                                            getTitlesWidget: (value, meta) {
-                                              return Text(
-                                                value.toStringAsFixed(0),
-                                                style: const TextStyle(
-                                                  color: AppColors.textSecondary,
-                                                  fontSize: 11,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        bottomTitles: AxisTitles(
-                                          sideTitles: SideTitles(
-                                            showTitles: true,
-                                            reservedSize: 28,
-                                            getTitlesWidget: (value, meta) {
-                                              const labels = [
-                                                'M',
-                                                'T',
-                                                'W',
-                                                'T',
-                                                'F',
-                                                'S',
-                                                'S'
-                                              ];
-                                              final index = value.toInt();
-                                              if (index < 0 ||
-                                                  index >= labels.length) {
-                                                return const SizedBox.shrink();
-                                              }
-                                              return Text(
-                                                labels[index],
-                                                style: const TextStyle(
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                      lineBarsData: [
-                                        LineChartBarData(
-                                          spots: weeklySpots,
-                                          isCurved: true,
-                                          barWidth: 4,
-                                          isStrokeCapRound: true,
-                                          color: AppColors.secondary,
-                                          dotData: FlDotData(
-                                            show: true,
-                                            getDotPainter:
-                                                (spot, percent, bar, index) {
-                                              return FlDotCirclePainter(
-                                                radius: 4.2,
-                                                color: AppColors.highlight,
-                                                strokeWidth: 2,
-                                                strokeColor:
-                                                    AppColors.background,
-                                              );
-                                            },
-                                          ),
-                                          belowBarData: BarAreaData(
-                                            show: true,
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                AppColors.secondary
-                                                    .withValues(alpha: 0.28),
-                                                AppColors.secondary
-                                                    .withValues(alpha: 0.02),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.94),
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Weekly insight',
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  insight,
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedStyle,
+                                  isExpanded: true,
+                                  dropdownColor: AppColors.surface,
                                   style: const TextStyle(
-                                    color: AppColors.textSecondary,
+                                    color: AppColors.textPrimary,
                                     fontSize: 14,
-                                    height: 1.55,
+                                  ),
+                                  items: styles.map((style) {
+                                    return DropdownMenuItem<String>(
+                                      value: style,
+                                      child: Text(style),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _selectedStyle = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryCard(
+                                    title: 'Avg Score',
+                                    value: avgScore == 0
+                                        ? '-'
+                                        : avgScore.toStringAsFixed(1),
+                                    subtitle: 'Selected range',
+                                    icon: Icons.star_rounded,
+                                    accent: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _SummaryCard(
+                                    title: 'Sessions',
+                                    value: filteredItems.length.toString(),
+                                    subtitle: 'Selected range',
+                                    icon: Icons.local_fire_department_rounded,
+                                    accent: AppColors.secondary,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
 
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 14),
 
-                          const Text(
-                            'Recent activity',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryCard(
+                                    title: 'Best Style',
+                                    value: bestStyle,
+                                    subtitle: 'Top performer',
+                                    icon: Icons.music_note_rounded,
+                                    accent: AppColors.highlight,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _SummaryCard(
+                                    title: 'Consistency',
+                                    value: '$activeDays',
+                                    subtitle: 'Active days',
+                                    icon: Icons.insights_rounded,
+                                    accent: AppColors.secondary,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 14),
 
-                          if (filteredItems.isEmpty)
+                            const SizedBox(height: 24),
+
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 color: AppColors.surface.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(28),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.08),
                                 ),
                               ),
-                              child: const Text(
-                                'No sessions found for the selected filters.',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            )
-                          else
-                            ...filteredItems.map(
-                              (session) => Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: _RecentSessionCard(
-                                  session: session,
-                                  dateLabel: _formatDateLabel(session.createdAt),
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Weekly score trend',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Your average performance over the last 7 days.',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    height: 220,
+                                    child: LineChart(
+                                      LineChartData(
+                                        minY: 0,
+                                        maxY: 10,
+                                        gridData: FlGridData(
+                                          show: true,
+                                          drawVerticalLine: false,
+                                          horizontalInterval: 2,
+                                          getDrawingHorizontalLine: (_) => FlLine(
+                                            color: Colors.white.withValues(alpha: 0.06),
+                                            strokeWidth: 1,
+                                          ),
+                                        ),
+                                        borderData: FlBorderData(show: false),
+                                        titlesData: FlTitlesData(
+                                          topTitles: const AxisTitles(
+                                            sideTitles: SideTitles(showTitles: false),
+                                          ),
+                                          rightTitles: const AxisTitles(
+                                            sideTitles: SideTitles(showTitles: false),
+                                          ),
+                                          leftTitles: AxisTitles(
+                                            sideTitles: SideTitles(
+                                              showTitles: true,
+                                              interval: 2,
+                                              reservedSize: 30,
+                                              getTitlesWidget: (value, meta) {
+                                                return Text(
+                                                  value.toStringAsFixed(0),
+                                                  style: const TextStyle(
+                                                    color: AppColors.textSecondary,
+                                                    fontSize: 11,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          bottomTitles: AxisTitles(
+                                            sideTitles: SideTitles(
+                                              showTitles: true,
+                                              reservedSize: 28,
+                                              getTitlesWidget: (value, meta) {
+                                                const labels = [
+                                                  'M',
+                                                  'T',
+                                                  'W',
+                                                  'T',
+                                                  'F',
+                                                  'S',
+                                                  'S'
+                                                ];
+                                                final index = value.toInt();
+                                                if (index < 0 || index >= labels.length) {
+                                                  return const SizedBox.shrink();
+                                                }
+                                                return Text(
+                                                  labels[index],
+                                                  style: const TextStyle(
+                                                    color: AppColors.textSecondary,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        lineBarsData: [
+                                          LineChartBarData(
+                                            spots: weeklySpots,
+                                            isCurved: true,
+                                            barWidth: 4,
+                                            isStrokeCapRound: true,
+                                            color: AppColors.secondary,
+                                            dotData: FlDotData(
+                                              show: true,
+                                              getDotPainter:
+                                                  (spot, percent, bar, index) {
+                                                return FlDotCirclePainter(
+                                                  radius: 4.2,
+                                                  color: AppColors.highlight,
+                                                  strokeWidth: 2,
+                                                  strokeColor: AppColors.background,
+                                                );
+                                              },
+                                            ),
+                                            belowBarData: BarAreaData(
+                                              show: true,
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  AppColors.secondary.withValues(alpha: 0.28),
+                                                  AppColors.secondary.withValues(alpha: 0.02),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+
+                            const SizedBox(height: 24),
+
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Weekly insight',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    insight,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 14,
+                                      height: 1.55,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            const Text(
+                              'Recent activity',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            if (filteredItems.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface.withValues(alpha: 0.94),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'No sessions found for the selected filters.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            else
+                              ...filteredItems.map(
+                                (session) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: _RecentSessionCard(
+                                    session: session,
+                                    dateLabel: _formatDateLabel(session.createdAt),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../theme/app_colors.dart';
 import '../../services/analysis_service.dart';
+import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
-import 'processing_screen.dart';
+import 'video_review_screen.dart';
 
 class StartDanceScreen extends StatefulWidget {
   const StartDanceScreen({super.key});
@@ -15,46 +15,39 @@ class StartDanceScreen extends StatefulWidget {
 class _StartDanceScreenState extends State<StartDanceScreen> {
   final ImagePicker _picker = ImagePicker();
   final AnalysisService _analysisService = AnalysisService();
-
   bool _isBusy = false;
 
-  Future<void> _handlePickedVideo({
+  Future<void> _openReviewScreen({
     required XFile videoFile,
     required String sourceType,
     required String sourceLabel,
   }) async {
-    try {
-      final session = await _analysisService.uploadAnalysisVideo(
-        mode: 'auto_detect',
-        sourceType: sourceType,
-        filePath: videoFile.path,
-      );
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProcessingScreen(
-            analysisSessionId: session.id,
-            styleName: 'Auto-detect mode',
-            stepName: 'Predicting move...',
-            sourceLabel: sourceLabel,
-            filePath: videoFile.path,
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoReviewScreen(
+          videoPath: videoFile.path,
+          sourceLabel: sourceLabel,
+          title: 'Review your video',
+          subtitle:
+              'Check the framing before analysis. If needed, record again or choose another clip.',
+          styleName: 'Auto-detect mode',
+          stepName: 'Predicting move...',
+          onRetry: () {
+            Navigator.pop(context);
+          },
+          onConfirm: () {
+            return _analysisService.uploadAnalysisVideo(
+              mode: 'auto',
+              sourceType: sourceType,
+              filePath: videoFile.path,
+            );
+          },
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   Future<void> _pickFromGallery() async {
@@ -72,7 +65,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
       if (!mounted) return;
 
       if (pickedVideo != null) {
-        await _handlePickedVideo(
+        await _openReviewScreen(
           videoFile: pickedVideo,
           sourceType: 'gallery',
           sourceLabel: 'Gallery upload',
@@ -109,7 +102,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
       if (!mounted) return;
 
       if (recordedVideo != null) {
-        await _handlePickedVideo(
+        await _openReviewScreen(
           videoFile: recordedVideo,
           sourceType: 'camera',
           sourceLabel: 'Camera recording',
@@ -257,14 +250,42 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Recording tips',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            _InfoLine('Keep your full body visible.'),
+                            _InfoLine('Use stable camera placement and good lighting.'),
+                            _InfoLine('Record only one move if possible.'),
+                            _InfoLine('After recording, you will be able to review the video before analysis.'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       _ActionCard(
                         title: 'Upload from Gallery',
                         subtitle:
                             'Choose an existing dance video from your phone.',
-                        icon: _isBusy
-                            ? Icons.hourglass_top_rounded
-                            : Icons.upload_rounded,
+                        icon: Icons.upload_rounded,
                         accent: AppColors.secondary,
                         onTap: _isBusy ? null : _pickFromGallery,
                       ),
@@ -272,34 +293,10 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                       _ActionCard(
                         title: 'Record with Camera',
                         subtitle:
-                            'Record your dance directly in the app and let AI identify the move.',
+                            'Record your dance and review the clip before starting analysis.',
                         icon: Icons.videocam_rounded,
                         accent: AppColors.primary,
                         onTap: _isBusy ? null : _recordWithCamera,
-                      ),
-                      const SizedBox(height: 28),
-                      const Text(
-                        'How it works',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const _InfoCard(
-                        icon: Icons.video_library_rounded,
-                        text: 'Upload or record a full-body dance video.',
-                      ),
-                      const SizedBox(height: 12),
-                      const _InfoCard(
-                        icon: Icons.accessibility_new_rounded,
-                        text: 'AI extracts body keypoints and tracks movement.',
-                      ),
-                      const SizedBox(height: 12),
-                      const _InfoCard(
-                        icon: Icons.psychology_rounded,
-                        text: 'The system predicts the dance style and move automatically.',
                       ),
                       if (_isBusy) ...[
                         const SizedBox(height: 24),
@@ -419,35 +416,27 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  final IconData icon;
+class _InfoLine extends StatelessWidget {
   final String text;
 
-  const _InfoCard({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoLine(this.text);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: AppColors.secondary,
-            size: 22,
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.secondary,
+              size: 16,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,

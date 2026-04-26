@@ -221,9 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 28),
-
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(22),
@@ -315,9 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ],
                               ),
                             ),
-
                             const SizedBox(height: 24),
-
                             Row(
                               children: [
                                 Expanded(
@@ -341,36 +337,60 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 14),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SmallDashboardCard(
-                                    title: 'Sessions',
-                                    value: '${dashboard?.totalSessions ?? 0}',
-                                    icon: Icons.local_fire_department_rounded,
-                                    accent: AppColors.highlight,
-                                  ),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: _SmallDashboardCard(
-                                    title: 'Status',
-                                    value: snapshot.connectionState ==
-                                            ConnectionState.waiting
-                                        ? 'Loading'
-                                        : 'Synced',
-                                    icon: Icons.cloud_done_rounded,
-                                    accent: AppColors.secondary,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(14),
+                                      color: AppColors.highlight.withValues(alpha: 0.14),
+                                    ),
+                                    child: const Icon(
+                                      Icons.local_fire_department_rounded,
+                                      color: AppColors.highlight,
+                                      size: 22,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Sessions',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${dashboard?.totalSessions ?? 0}',
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-
                             const SizedBox(height: 24),
-
                             if (dashboard?.latestSession != null)
                               Container(
                                 width: double.infinity,
@@ -440,9 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                               ),
-
                             const SizedBox(height: 26),
-
                             const Text(
                               'Start here',
                               style: TextStyle(
@@ -451,9 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-
                             const SizedBox(height: 14),
-
                             _FeatureCard(
                               title: 'Learning',
                               subtitle:
@@ -470,9 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
-
                             const SizedBox(height: 16),
-
                             _FeatureCard(
                               title: 'Start Dance',
                               subtitle:
@@ -489,9 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
-
                             const SizedBox(height: 18),
-
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(18),
@@ -562,17 +574,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         label: 'House',
                                         color: AppColors.secondary,
                                       ),
-                                      SizedBox(width: 8),
-                                      _MiniTag(
-                                        label: 'Beginner',
-                                        color: AppColors.highlight,
-                                      ),
                                     ],
                                   ),
                                 ],
                               ),
                             ),
-
                             const SizedBox(height: 24),
                           ],
                         );
@@ -833,4 +839,4 @@ class _NoStretchScrollBehavior extends ScrollBehavior {
   ) {
     return child;
   }
-}
+} 

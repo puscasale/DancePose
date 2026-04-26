@@ -30,6 +30,8 @@ def update_my_profile(
     current_user: User = Depends(get_current_user),
 ):
     current_user.full_name = profile_data.full_name.strip()
+    current_user.age = profile_data.age
+    current_user.dance_level = profile_data.dance_level
 
     db.add(current_user)
     db.commit()

@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../theme/app_colors.dart';
 import '../../services/analysis_service.dart';
 import '../welcome/widgets/background_glow.dart';
-import '../analysis/processing_screen.dart';
+import '../analysis/video_review_screen.dart';
 
 class StepDetailsScreen extends StatefulWidget {
   final int styleId;
@@ -126,90 +126,84 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
     if (styleName == 'House') {
       switch (stepName) {
         case 'Side Kick':
-          return 'A basic groove step where the body stays relaxed while one leg extends to the side with a clear rhythmic kick. Focus on bounce, balance, and staying light on the supporting leg.';
+          return 'Side Kick is a foundational house step built around groove, rebound, and clean side extension. The movement usually relies on a light bounce through the knees while one leg opens outward with clear rhythmic timing. Good execution depends on balance, relaxed posture, and staying connected to the beat rather than kicking too hard.';
         case 'Sworl':
-          return 'A turning groove with circular energy through the feet and hips. Keep the upper body loose and let the rotation feel smooth instead of forced.';
+          return 'Sworl is a rotational house movement that emphasizes circular flow through the feet, hips, and torso. It should feel smooth and musical, not rigid. The key is to let the turn travel naturally through the body while keeping the groove alive underneath the rotation.';
         case 'Farmer':
-          return 'A grounded house step built around weight shifts and steady foot placement. Think of it as a move that trains control, timing, and a strong connection to the beat.';
+          return 'Farmer is a grounded house step based on weight transfer and steady rhythmic placement of the feet. It helps build control, stability, and a stronger sense of timing. The movement works best when the dancer stays relaxed in the upper body and precise in the lower body.';
         case 'Shuffle':
-          return 'A classic house footwork idea based on quick sliding and switching steps. Stay low, keep the rhythm even, and make the movement feel continuous rather than sharp.';
+          return 'Shuffle in house dance focuses on quick foot switches, sliding actions, and continuous groove. It should look fluid rather than stiff or mechanical. The quality of the step often comes from staying low, maintaining even rhythm, and controlling the transitions between foot placements.';
         case 'Heel Step':
-          return 'A house variation that emphasizes heel placement and clean timing. Focus on precision in the feet while keeping the groove soft through the knees and torso.';
+          return 'Heel Step highlights heel placement as a rhythmic accent inside house footwork. It trains precision, timing, and body control while keeping the groove soft and natural. A strong execution depends on clean contact with the floor and smooth coordination between feet and torso.';
       }
     }
 
     if (styleName == 'Middle Hip-Hop') {
       switch (stepName) {
         case 'Rager Rabbit':
-          return 'A playful hip-hop groove built on quick rebounds and energetic accents. The goal is to keep the movement sharp while still looking relaxed and musical.';
+          return 'Rager Rabbit is an energetic hip-hop groove with quick rebounds and playful accents. The movement should stay sharp but still feel relaxed and musical. It usually works best when the dancer controls the bounce carefully and keeps the rhythm clear through the whole body.';
         case 'Club':
-          return 'A social-style groove with compact steps and a strong pulse in the chest and knees. Keep it confident, grounded, and easy to repeat with the music.';
+          return 'Club is a compact groove-based step often built around pulse, confidence, and repeatable rhythm. The chest, knees, and body center help drive the movement. It should feel grounded and socially musical, not overcomplicated.';
         case 'Brooklyn Bounce':
-          return 'A bounce-based hip-hop move where the groove comes from the knees, torso, and side-to-side rhythm. Focus on staying grounded and letting the bounce lead the whole body.';
+          return 'Brooklyn Bounce is centered on a strong bounce quality generated through the knees, torso, and side-to-side groove. The movement should look grounded, loose, and rhythmically confident. The bounce needs to lead the body naturally instead of being added artificially on top.';
         case 'Running Man':
-          return 'A well-known old-school street dance step built from alternating slide-and-step actions that imitate running in place. The move works best when the feet stay clean and the rhythm stays consistent.';
+          return 'Running Man is a classic street dance step built from alternating slide-and-step mechanics that create the illusion of running in place. Strong execution depends on rhythm consistency, clean foot placement, and keeping the movement light rather than heavy.';
         case 'Popcorn':
-          return 'A quick, reactive groove with small explosive accents through the body. Think of it as a move that mixes bounce with sudden controlled hits.';
+          return 'Popcorn combines bounce with quick explosive accents that give the movement a reactive quality. It should feel controlled and rhythmic rather than random. The key is to balance small hits with a stable groove underneath.';
       }
     }
 
     if (styleName == 'Street Jazz') {
       switch (stepName) {
         case 'Positions des pieds':
-          return 'A foundation exercise focused on clean foot positions and body alignment. Use it to build placement, control, and awareness before more dynamic movement.';
+          return 'Positions des pieds focuses on correct foot placement and body alignment, serving as a technical base for more advanced jazz movement. The goal is clarity, symmetry, and awareness of how the lower body supports posture and transitions.';
         case 'Plié':
-          return 'A fundamental bending action through the knees while maintaining alignment and control. In jazz-based training, plié helps build balance, softness, and power for transitions and jumps.';
+          return 'Plié is a fundamental bending action through the knees while maintaining posture, alignment, and control. In jazz-based movement it helps develop softness, strength, and preparation for transitions, turns, and jumps. The knees should bend with control and the body should remain lifted.';
         case 'Jump':
-          return 'A basic elevation move where take-off and landing should both stay controlled. Focus on posture, pointed feet, and landing softly through the knees.';
+          return 'Jump in street jazz trains elevation, control, and safe landings. The movement is not only about height, but also about posture, timing, pointed feet, and absorbing impact correctly through the legs. A clean jump starts and finishes with control.';
         case 'Passé Balance':
-          return 'A balance position where one leg is lifted and placed near the supporting knee. The move develops stability, posture, and control before turns or traveling combinations.';
+          return 'Passé Balance develops stability and placement by lifting one leg into passé while maintaining posture on the supporting side. It is useful for training balance, alignment, and body control before turns or more complex combinations.';
         case 'Paddbre':
-          return 'A traveling transition step designed to connect movements smoothly. Focus on elegance, clean direction changes, and keeping the upper body composed.';
+          return 'Paddbre acts as a connecting transition step that supports direction change and stylistic flow inside jazz movement. It should look elegant, intentional, and coordinated, with a calm upper body and clear lower-body placement.';
       }
     }
 
-    return 'Focus on rhythm, body control, and clean timing. Start slowly, then repeat until the movement feels natural.';
+    return 'Focus on rhythm, posture, and movement clarity. Repeat the step slowly first, then gradually increase the speed while keeping control.';
   }
 
-  Future<void> _handlePickedVideo({
+  Future<void> _openReviewScreen({
     required XFile videoFile,
     required String sourceType,
     required String sourceLabel,
   }) async {
-    try {
-      final session = await _analysisService.uploadAnalysisVideo(
-        mode: 'learning',
-        sourceType: sourceType,
-        filePath: videoFile.path,
-        selectedStyleId: widget.styleId,
-        selectedMoveId: widget.moveId,
-      );
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProcessingScreen(
-            analysisSessionId: session.id,
-            styleName: widget.styleName,
-            stepName: widget.stepName,
-            sourceLabel: sourceLabel,
-            filePath: videoFile.path,
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoReviewScreen(
+          videoPath: videoFile.path,
+          sourceLabel: sourceLabel,
+          title: 'Review your practice video',
+          subtitle:
+              'Check if the selected move is clearly visible before starting analysis.',
+          styleName: widget.styleName,
+          stepName: widget.stepName,
+          onRetry: () {
+            Navigator.pop(context);
+          },
+          onConfirm: () {
+            return _analysisService.uploadAnalysisVideo(
+              mode: 'learning',
+              sourceType: sourceType,
+              filePath: videoFile.path,
+              selectedStyleId: widget.styleId,
+              selectedMoveId: widget.moveId,
+            );
+          },
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   Future<void> _pickVideoFromGallery() async {
@@ -227,7 +221,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
       if (!mounted) return;
 
       if (pickedVideo != null) {
-        await _handlePickedVideo(
+        await _openReviewScreen(
           videoFile: pickedVideo,
           sourceType: 'gallery',
           sourceLabel: 'Gallery upload',
@@ -265,7 +259,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
       if (!mounted) return;
 
       if (recordedVideo != null) {
-        await _handlePickedVideo(
+        await _openReviewScreen(
           videoFile: recordedVideo,
           sourceType: 'camera',
           sourceLabel: 'Camera recording',
@@ -359,16 +353,6 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                             label: widget.styleName,
                             color: widget.accentColor,
                           ),
-                          const SizedBox(width: 8),
-                          const _MiniTag(
-                            label: 'Beginner',
-                            color: AppColors.highlight,
-                          ),
-                          const SizedBox(width: 8),
-                          const _MiniTag(
-                            label: '3 min practice',
-                            color: AppColors.secondary,
-                          ),
                         ],
                       ),
                       const SizedBox(height: 22),
@@ -401,6 +385,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                           ),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               width: 62,
@@ -429,7 +414,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                                   Text(
                                     _getStepDescription(
                                       widget.styleName,
@@ -438,7 +423,7 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                                     style: const TextStyle(
                                       color: AppColors.textSecondary,
                                       fontSize: 14,
-                                      height: 1.5,
+                                      height: 1.6,
                                     ),
                                   ),
                                 ],
@@ -448,76 +433,34 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                ),
-                              ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Difficulty',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'Beginner',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Practice tips',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                ),
-                              ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Practice time',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    '3 min',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                            SizedBox(height: 10),
+                            _InfoLine('Keep your full body visible.'),
+                            _InfoLine('Try to perform only the selected move.'),
+                            _InfoLine('Avoid long pauses before or after the movement.'),
+                            _InfoLine('After recording, review the clip before analysis.'),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 28),
                       SizedBox(
@@ -606,6 +549,43 @@ class _MiniTag extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  final String text;
+
+  const _InfoLine(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.secondary,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
