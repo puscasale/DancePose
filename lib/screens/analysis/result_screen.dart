@@ -4,9 +4,8 @@ import '../../models/progress_history_item.dart';
 import '../../services/progress_service.dart';
 import '../../services/result_service.dart';
 import '../../theme/app_colors.dart';
-import '../home/home_screen.dart';
-import '../welcome/widgets/background_glow.dart';
 import '../navigation/main_navigation_screen.dart';
+import '../welcome/widgets/background_glow.dart';
 
 class ResultScreen extends StatefulWidget {
   final int analysisSessionId;
@@ -30,6 +29,8 @@ class _ResultScreenState extends State<ResultScreen> {
 
   late Future<_ResultScreenData> _screenFuture;
 
+  static const double _videoFps = 30.0;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +38,8 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<_ResultScreenData> _loadData() async {
-    final result = await _resultService.getResultForSession(widget.analysisSessionId);
+    final result =
+        await _resultService.getResultForSession(widget.analysisSessionId);
     final history = await _progressService.getHistory();
 
     ProgressHistoryItem? currentItem;
@@ -67,60 +69,58 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
+  bool _isPlaceholder(String value) {
+    final v = value.trim().toLowerCase();
+    return v.isEmpty || v.contains('predicting') || v == '--';
+  }
+
+  String _displayStyleName(AnalysisResultModel result) {
+    if ((result.predictedStyleName ?? '').trim().isNotEmpty) {
+      return result.predictedStyleName!;
+    }
+    if (!_isPlaceholder(widget.styleName)) {
+      return widget.styleName;
+    }
+    return 'Detected style';
+  }
+
+  String _displayMoveName(AnalysisResultModel result) {
+    if ((result.predictedMoveName ?? '').trim().isNotEmpty) {
+      return result.predictedMoveName!;
+    }
+    if (!_isPlaceholder(widget.stepName)) {
+      return widget.stepName;
+    }
+    return 'Detected move';
+  }
+
+  String _scoreLabel(double score) {
+    if (score >= 9.0) return 'Excellent';
+    if (score >= 8.0) return 'Strong';
+    if (score >= 7.0) return 'Good';
+    if (score >= 6.0) return 'Developing';
+    return 'Needs work';
+  }
+
   List<String> _buildBadges(AnalysisResultModel result) {
     final badges = <String>[];
+    final overall = result.overallScore ?? 0;
+    final arms = result.armsScore ?? 0;
+    final legs = result.legsScore ?? 0;
 
-    if ((result.overallScore ?? 0) >= 9.0) {
-      badges.add('Excellent control');
-    } else if ((result.overallScore ?? 0) >= 8.0) {
-      badges.add('Strong performance');
+    badges.add(_scoreLabel(overall));
+
+    if (legs > arms) {
+      badges.add('Lower body stronger');
+    } else if (arms > legs) {
+      badges.add('Upper body stronger');
     }
 
-    if ((result.legsScore ?? 0) > (result.armsScore ?? 0)) {
-      badges.add('Strong legs');
-    } else if ((result.armsScore ?? 0) > (result.legsScore ?? 0)) {
-      badges.add('Strong arms');
-    }
-
-    if ((result.overallScore ?? 0) >= 8.5) {
-      badges.add('Great timing');
-    }
-
-    if (badges.isEmpty) {
-      badges.add('Good foundation');
+    if (overall >= 8.5) {
+      badges.add('Stable execution');
     }
 
     return badges;
-  }
-
-  String _mainStrength(AnalysisResultModel result) {
-    final arms = result.armsScore ?? 0;
-    final legs = result.legsScore ?? 0;
-
-    if (legs > arms) {
-      return 'Your lower-body rhythm and foot placement are currently the strongest part of this performance.';
-    }
-
-    if (arms > legs) {
-      return 'Your upper-body control and arm accents stand out most in this session.';
-    }
-
-    return 'Your movement looks balanced overall, with similar control between upper and lower body.';
-  }
-
-  String _mainWeakness(AnalysisResultModel result) {
-    final arms = result.armsScore ?? 0;
-    final legs = result.legsScore ?? 0;
-
-    if (legs < arms) {
-      return 'Focus more on leg timing, foot precision, and consistency in the lower-body transitions.';
-    }
-
-    if (arms < legs) {
-      return 'Focus more on cleaner arm placement, sharper finishes, and upper-body clarity.';
-    }
-
-    return 'Your next improvement step is to refine timing and clean up the final positions of each movement.';
   }
 
   String _comparisonText(
@@ -143,7 +143,7 @@ class _ResultScreenState extends State<ResultScreen> {
     }
 
     if (diff < 0) {
-      return 'This session is $absDiff points lower than your previous one, so it is a good chance to review consistency.';
+      return 'This session is $absDiff points lower than the previous one, so it is a good opportunity to review consistency.';
     }
 
     return 'Your score is identical to the previous session, which suggests stable performance.';
@@ -155,7 +155,36 @@ class _ResultScreenState extends State<ResultScreen> {
     final date = item.createdAt;
     final dateText =
         '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
     return '${item.mode} • ${item.sourceType} • $dateText';
+  }
+
+  String _formatSecondFromFrame(int? frame) {
+    if (frame == null) return '--';
+    final seconds = frame / _videoFps;
+    return '${seconds.toStringAsFixed(2)} s';
+  }
+
+  List<String> _problematicJoints(AnalysisResultModel result) {
+    final raw = result.problematicJointsText;
+    if (raw == null || raw.trim().isEmpty) return [];
+
+    return raw
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .map(_prettifyJoint)
+        .toList();
+  }
+
+  String _prettifyJoint(String joint) {
+    return joint
+        .split('_')
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1);
+        })
+        .join(' ');
   }
 
   @override
@@ -166,7 +195,7 @@ class _ResultScreenState extends State<ResultScreen> {
           const BackgroundGlow(),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
               child: FutureBuilder<_ResultScreenData>(
                 future: _screenFuture,
                 builder: (context, snapshot) {
@@ -183,11 +212,10 @@ class _ResultScreenState extends State<ResultScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         IconButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
+                          onPressed: () => Navigator.pop(context),
                           style: IconButton.styleFrom(
-                            backgroundColor: AppColors.surface.withValues(alpha: 0.78),
+                            backgroundColor:
+                                AppColors.surface.withValues(alpha: 0.82),
                             padding: const EdgeInsets.all(12),
                           ),
                           icon: const Icon(
@@ -240,11 +268,12 @@ class _ResultScreenState extends State<ResultScreen> {
                           child: OutlinedButton(
                             onPressed: () {
                               Navigator.of(context).pushAndRemoveUntil(
-  MaterialPageRoute(
-    builder: (_) => const MainNavigationScreen(initialIndex: 0),
-  ),
-  (route) => false,
-);
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MainNavigationScreen(initialIndex: 0),
+                                ),
+                                (route) => false,
+                              );
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.textPrimary,
@@ -266,6 +295,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   final data = snapshot.data!;
                   final result = data.result;
                   final badges = _buildBadges(result);
+                  final joints = _problematicJoints(result);
 
                   return SingleChildScrollView(
                     physics: const ClampingScrollPhysics(),
@@ -273,11 +303,10 @@ class _ResultScreenState extends State<ResultScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         IconButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
+                          onPressed: () => Navigator.pop(context),
                           style: IconButton.styleFrom(
-                            backgroundColor: AppColors.surface.withValues(alpha: 0.78),
+                            backgroundColor:
+                                AppColors.surface.withValues(alpha: 0.82),
                             padding: const EdgeInsets.all(12),
                           ),
                           icon: const Icon(
@@ -286,20 +315,24 @@ class _ResultScreenState extends State<ResultScreen> {
                             size: 18,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 18),
+
+                        const _SectionEyebrow(text: 'Analysis result'),
+                        const SizedBox(height: 10),
+
                         Text(
-                          widget.styleName,
+                          _displayStyleName(result),
                           style: const TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 13,
+                            fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.stepName,
+                          _displayMoveName(result),
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 28,
+                            fontSize: 30,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -311,7 +344,8 @@ class _ResultScreenState extends State<ResultScreen> {
                             fontSize: 13,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -319,103 +353,167 @@ class _ResultScreenState extends State<ResultScreen> {
                               .map((badge) => _BadgeChip(label: badge))
                               .toList(),
                         ),
-                        const SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface.withValues(alpha: 0.94),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Overall score',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                result.overallScore?.toStringAsFixed(1) ?? '--',
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 44,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
+
+                        const SizedBox(height: 22),
+
+                        _HeroScoreCard(
+                          overallScore: result.overallScore,
+                          label: _scoreLabel(result.overallScore ?? 0),
                         ),
-                        const SizedBox(height: 20),
+
+                        const SizedBox(height: 16),
+
                         Row(
                           children: [
                             Expanded(
-                              child: _ScoreCard(
+                              child: _MiniMetricCard(
                                 title: 'Arms',
                                 value: result.armsScore,
+                                icon: Icons.accessibility_new_rounded,
                               ),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: _ScoreCard(
+                              child: _MiniMetricCard(
                                 title: 'Legs',
                                 value: result.legsScore,
+                                icon: Icons.directions_run_rounded,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        _HighlightCard(
-                          title: 'Main strength',
-                          content: _mainStrength(result),
-                          icon: Icons.emoji_events_rounded,
+
+                        const SizedBox(height: 26),
+
+                        const _SectionHeader(
+                          title: 'Key moments',
+                          subtitle:
+                              'The strongest and weakest detected moments in your performance.',
                         ),
-                        const SizedBox(height: 16),
-                        _HighlightCard(
-                          title: 'Main improvement area',
-                          content: _mainWeakness(result),
-                          icon: Icons.track_changes_rounded,
+                        const SizedBox(height: 14),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _MomentInfoCard(
+                                title: 'Best moment',
+                                timeText: _formatSecondFromFrame(
+                                  result.bestNoviceFrame,
+                                ),
+                                icon: Icons.emoji_events_rounded,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _MomentInfoCard(
+                                title: 'Needs improvement',
+                                timeText: _formatSecondFromFrame(
+                                  result.worstNoviceFrame,
+                                ),
+                                icon: Icons.track_changes_rounded,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _HighlightCard(
-                          title: 'Comparison with previous session',
-                          content: _comparisonText(data.currentItem, data.previousItem),
-                          icon: Icons.compare_arrows_rounded,
+
+                        const SizedBox(height: 14),
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _HeatmapCard(
+                                title: 'Best heatmap',
+                                subtitle: _formatSecondFromFrame(
+                                  result.bestNoviceFrame,
+                                ),
+                                imageUrl: result.bestHeatmapUrl,
+                                icon: Icons.emoji_events_rounded,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _HeatmapCard(
+                                title: 'Worst heatmap',
+                                subtitle: _formatSecondFromFrame(
+                                  result.worstNoviceFrame,
+                                ),
+                                imageUrl: result.worstHeatmapUrl,
+                                icon: Icons.warning_amber_rounded,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _TextCard(
-                          title: 'AI feedback',
+
+                        if (joints.isNotEmpty) ...[
+                          const SizedBox(height: 26),
+                          const _SectionHeader(
+                            title: 'Most problematic joints',
+                            subtitle:
+                                'These body points showed the largest deviation in the weaker moment.',
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: joints
+                                .map((joint) => _JointChip(label: joint))
+                                .toList(),
+                          ),
+                        ],
+
+                        const SizedBox(height: 26),
+
+                        const _SectionHeader(
+                          title: 'AI coach feedback',
+                          subtitle:
+                              'Short, practical feedback generated from the movement analysis.',
+                        ),
+                        const SizedBox(height: 14),
+
+                        _AiTextCard(
+                          title: 'Summary',
                           content: result.feedbackSummary ??
                               'No summary available yet.',
+                          icon: Icons.auto_awesome_rounded,
                         ),
-                        const SizedBox(height: 16),
-                        _TextCard(
+                        const SizedBox(height: 12),
+                        _AiTextCard(
                           title: 'Strengths',
                           content: result.strengthsText ??
                               'No strengths available yet.',
+                          icon: Icons.trending_up_rounded,
                         ),
-                        const SizedBox(height: 16),
-                        _TextCard(
+                        const SizedBox(height: 12),
+                        _AiTextCard(
                           title: 'Improvements',
                           content: result.improvementsText ??
                               'No improvement suggestions available yet.',
+                          icon: Icons.build_circle_rounded,
                         ),
+
+                        const SizedBox(height: 26),
+
+                        _InsightCard(
+                          title: 'Comparison with previous session',
+                          content:
+                              _comparisonText(data.currentItem, data.previousItem),
+                          icon: Icons.compare_arrows_rounded,
+                        ),
+
                         const SizedBox(height: 24),
+
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
                               Navigator.of(context).pushAndRemoveUntil(
-  MaterialPageRoute(
-    builder: (_) => const MainNavigationScreen(initialIndex: 0),
-  ),
-  (route) => false,
-);
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MainNavigationScreen(initialIndex: 0),
+                                ),
+                                (route) => false,
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -453,6 +551,72 @@ class _ResultScreenData {
   });
 }
 
+class _SectionEyebrow extends StatelessWidget {
+  final String text;
+
+  const _SectionEyebrow({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.secondary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _BadgeChip extends StatelessWidget {
   final String label;
 
@@ -483,13 +647,235 @@ class _BadgeChip extends StatelessWidget {
   }
 }
 
-class _ScoreCard extends StatelessWidget {
+class _JointChip extends StatelessWidget {
+  final String label;
+
+  const _JointChip({
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.highlight.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.highlight.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroScoreCard extends StatelessWidget {
+  final double? overallScore;
+  final String label;
+
+  const _HeroScoreCard({
+    required this.overallScore,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final score = overallScore ?? 0.0;
+    final progress = (score / 10.0).clamp(0.0, 1.0).toDouble();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.surface.withValues(alpha: 0.98),
+            AppColors.primary.withValues(alpha: 0.18),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 108,
+            height: 108,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 108,
+                  height: 108,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 9,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    valueColor:
+                        const AlwaysStoppedAnimation(AppColors.secondary),
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      score.toStringAsFixed(1),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '/10',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Overall score',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMetricCard extends StatelessWidget {
   final String title;
   final double? value;
+  final IconData icon;
 
-  const _ScoreCard({
+  const _MiniMetricCard({
     required this.title,
     required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: AppColors.secondary.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.secondary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value?.toStringAsFixed(1) ?? '--',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MomentInfoCard extends StatelessWidget {
+  final String title;
+  final String timeText;
+  final IconData icon;
+
+  const _MomentInfoCard({
+    required this.title,
+    required this.timeText,
+    required this.icon,
   });
 
   @override
@@ -506,6 +892,8 @@ class _ScoreCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, color: AppColors.highlight, size: 22),
+          const SizedBox(height: 10),
           Text(
             title,
             style: const TextStyle(
@@ -513,12 +901,12 @@ class _ScoreCard extends StatelessWidget {
               fontSize: 13,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            value?.toStringAsFixed(1) ?? '--',
+            timeText,
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -528,12 +916,114 @@ class _ScoreCard extends StatelessWidget {
   }
 }
 
-class _HighlightCard extends StatelessWidget {
+class _HeatmapCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String? imageUrl;
+  final IconData icon;
+
+  const _HeatmapCard({
+    required this.title,
+    required this.subtitle,
+    required this.imageUrl,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.highlight, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          AspectRatio(
+            aspectRatio: 1.2,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: (imageUrl != null && imageUrl!.trim().isNotEmpty)
+                  ? Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const _HeatmapPlaceholder();
+                      },
+                    )
+                  : const _HeatmapPlaceholder(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeatmapPlaceholder extends StatelessWidget {
+  const _HeatmapPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white.withValues(alpha: 0.04),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image_outlined,
+            color: Colors.white.withValues(alpha: 0.55),
+            size: 34,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Heatmap unavailable',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
   final String title;
   final String content;
   final IconData icon;
 
-  const _HighlightCard({
+  const _InsightCard({
     required this.title,
     required this.content,
     required this.icon,
@@ -543,7 +1033,7 @@ class _HighlightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(24),
@@ -555,8 +1045,8 @@ class _HighlightCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: AppColors.highlight.withValues(alpha: 0.14),
@@ -598,20 +1088,22 @@ class _HighlightCard extends StatelessWidget {
   }
 }
 
-class _TextCard extends StatelessWidget {
+class _AiTextCard extends StatelessWidget {
   final String title;
   final String content;
+  final IconData icon;
 
-  const _TextCard({
+  const _AiTextCard({
     required this.title,
     required this.content,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(24),
@@ -619,24 +1111,45 @@ class _TextCard extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.08),
         ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: AppColors.primary.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primary,
+              size: 22,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            content,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              height: 1.5,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  content,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.55,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

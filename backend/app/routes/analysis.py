@@ -1,10 +1,9 @@
 import os
 import shutil
-import random
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,6 +12,11 @@ from app.models.analysis_result import AnalysisResult
 from app.schemas.analysis import AnalysisSessionCreate, AnalysisSessionResponse
 from app.routes.dependencies import get_current_user
 from app.models.user import User
+from app.ai.pipeline import run_preprocessing_pipeline
+from app.ai.classify import classify_fusion_vit, resolve_predicted_ids
+from app.ai.scoring import compute_overall_ai_score, compute_body_part_scores
+from app.ai.heatmap import generate_session_heatmaps
+from app.ai.llm_feedback import generate_llm_feedback
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -20,40 +24,24 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def _generate_mock_result_text(mode: str, selected_move_id: int | None) -> tuple[str, str, str]:
-    if mode == "auto_detect":
-        summary = (
-            "The AI completed a preliminary movement analysis and generated an automatic prediction flow. "
-            "Timing appears promising, but some transitions still need refinement."
-        )
-        strengths = (
-            "Good overall rhythm, stable movement energy, and clear lower-body control in the main sequence."
-        )
-        improvements = (
-            "Work on cleaner upper-body accents, more precise arm placement, and smoother transitions between steps."
-        )
-        return summary, strengths, improvements
-
-    if selected_move_id is not None:
-        summary = (
-            "The uploaded performance shows a solid understanding of the selected move, with good timing and body coordination overall."
-        )
-        strengths = (
-            "Strong rhythm, balanced foot placement, and good consistency through the main phase of the movement."
-        )
-        improvements = (
-            "Try to improve sharpness in the upper body and make the movement finish positions cleaner and more controlled."
-        )
-        return summary, strengths, improvements
-
-    return (
-        "The analysis has been completed successfully.",
-        "Movement flow is stable and readable.",
-        "Refine timing and posture for a cleaner final execution.",
-    )
-
-
-def _create_mock_result_for_session(db: Session, session: AnalysisSession) -> AnalysisResult:
+def _create_result_for_session(
+    db: Session,
+    session: AnalysisSession,
+    overall_score: float,
+    arms_score: float,
+    legs_score: float,
+    feedback_summary: str | None = None,
+    strengths_text: str | None = None,
+    improvements_text: str | None = None,
+    best_expert_file: str | None = None,
+    best_novice_frame: int | None = None,
+    best_expert_frame: int | None = None,
+    worst_novice_frame: int | None = None,
+    worst_expert_frame: int | None = None,
+    problematic_joints_text: str | None = None,
+    best_heatmap_url: str | None = None,
+    worst_heatmap_url: str | None = None,
+) -> AnalysisResult:
     existing_result = (
         db.query(AnalysisResult)
         .filter(AnalysisResult.analysis_session_id == session.id)
@@ -62,33 +50,32 @@ def _create_mock_result_for_session(db: Session, session: AnalysisSession) -> An
     if existing_result:
         return existing_result
 
-    overall_score = round(random.uniform(7.2, 9.4), 1)
-    arms_score = round(max(5.0, min(10.0, overall_score + random.uniform(-0.8, 0.6))), 1)
-    legs_score = round(max(5.0, min(10.0, overall_score + random.uniform(-0.6, 0.8))), 1)
-
-    summary, strengths, improvements = _generate_mock_result_text(
-        session.mode,
-        session.selected_move_id,
-    )
-
-    mock_result = AnalysisResult(
+    result = AnalysisResult(
         analysis_session_id=session.id,
         overall_score=overall_score,
         arms_score=arms_score,
         legs_score=legs_score,
-        feedback_summary=summary,
-        strengths_text=strengths,
-        improvements_text=improvements,
+        feedback_summary=feedback_summary,
+        strengths_text=strengths_text,
+        improvements_text=improvements_text,
+        best_expert_file=best_expert_file,
+        best_novice_frame=best_novice_frame,
+        best_expert_frame=best_expert_frame,
+        worst_novice_frame=worst_novice_frame,
+        worst_expert_frame=worst_expert_frame,
+        problematic_joints_text=problematic_joints_text,
+        best_heatmap_url=best_heatmap_url,
+        worst_heatmap_url=worst_heatmap_url,
     )
 
     session.status = "completed"
     session.completed_at = datetime.now(timezone.utc)
 
-    db.add(mock_result)
+    db.add(result)
     db.commit()
-    db.refresh(mock_result)
+    db.refresh(result)
 
-    return mock_result
+    return result
 
 
 @router.post("/", response_model=AnalysisSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -111,14 +98,12 @@ def create_analysis_session(
     db.commit()
     db.refresh(new_session)
 
-    _create_mock_result_for_session(db, new_session)
-    db.refresh(new_session)
-
     return new_session
 
 
 @router.post("/upload", response_model=AnalysisSessionResponse, status_code=status.HTTP_201_CREATED)
 def upload_analysis_video(
+    request: Request,
     mode: str = Form(...),
     source_type: str = Form(...),
     selected_style_id: int | None = Form(None),
@@ -134,10 +119,7 @@ def upload_analysis_video(
     _, ext = os.path.splitext(video.filename.lower())
 
     if ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported video format",
-        )
+        raise HTTPException(status_code=400, detail="Unsupported video format")
 
     unique_filename = f"{uuid4().hex}{ext}"
     saved_path = os.path.join(UPLOAD_DIR, unique_filename)
@@ -159,10 +141,137 @@ def upload_analysis_video(
     db.commit()
     db.refresh(new_session)
 
-    _create_mock_result_for_session(db, new_session)
-    db.refresh(new_session)
+    try:
+        preprocessing_info = run_preprocessing_pipeline(
+            video_path=saved_path,
+            session_id=new_session.id,
+        )
 
-    return new_session
+        classification = classify_fusion_vit(
+            skeleton_path=preprocessing_info["model_input_path"],
+            video_feature_path=preprocessing_info["video_feature_path"],
+        )
+
+        predicted_style_id, predicted_move_id = resolve_predicted_ids(
+            db,
+            style_name=classification["style_name"],
+            move_name=classification["move_name"],
+        )
+
+        new_session.predicted_style_id = predicted_style_id
+        new_session.predicted_move_id = predicted_move_id
+        db.commit()
+        db.refresh(new_session)
+
+        selected_style_name = None
+        selected_move_name = None
+
+        if new_session.selected_style_id is not None:
+            from app.models.dance_style import DanceStyle
+            style_obj = (
+                db.query(DanceStyle)
+                .filter(DanceStyle.id == new_session.selected_style_id)
+                .first()
+            )
+            if style_obj:
+                selected_style_name = style_obj.name
+
+        if new_session.selected_move_id is not None:
+            from app.models.dance_move import DanceMove
+            move_obj = (
+                db.query(DanceMove)
+                .filter(DanceMove.id == new_session.selected_move_id)
+                .first()
+            )
+            if move_obj:
+                selected_move_name = move_obj.name
+
+        overall_data = compute_overall_ai_score(
+            novice_model_input_path=preprocessing_info["model_input_path"],
+            novice_video_feature_path=preprocessing_info["video_feature_path"],
+            mode=new_session.mode,
+            predicted_label=classification["predicted_label"],
+            selected_style_name=selected_style_name,
+            selected_move_name=selected_move_name,
+        )
+
+        part_scores = compute_body_part_scores(
+            novice_normalized_full_path=preprocessing_info["normalized_full_path"],
+            expert_normalized_full_path=overall_data["best_expert_path"],
+        )
+
+        overall_ai_score_raw = overall_data["overall_ai_score"]
+        arms_score_raw = part_scores["arms_score_raw"]
+        legs_score_raw = part_scores["legs_score_raw"]
+
+        overall_final_raw = (
+            0.5 * overall_ai_score_raw +
+            0.25 * arms_score_raw +
+            0.25 * legs_score_raw
+        )
+
+        overall_score = overall_final_raw / 10.0
+        arms_score = arms_score_raw / 10.0
+        legs_score = legs_score_raw / 10.0
+
+        heatmap_data = generate_session_heatmaps(
+            novice_skeleton_path=preprocessing_info["normalized_full_path"],
+            expert_skeleton_path=overall_data["best_expert_path"],
+            best_novice_frame=part_scores["best_novice_frame"],
+            best_expert_frame=part_scores["best_expert_frame"],
+            worst_novice_frame=part_scores["worst_novice_frame"],
+            worst_expert_frame=part_scores["worst_expert_frame"],
+            session_id=new_session.id,
+        )
+
+        base_url = str(request.base_url).rstrip("/")
+        best_heatmap_url = f"{base_url}/media/heatmaps/session_{new_session.id}_best_heatmap.png"
+        worst_heatmap_url = f"{base_url}/media/heatmaps/session_{new_session.id}_worst_heatmap.png"
+
+        best_time_sec = part_scores["best_novice_frame"] / 30.0
+        worst_time_sec = part_scores["worst_novice_frame"] / 30.0
+
+        llm_feedback = generate_llm_feedback(
+            predicted_label=classification["predicted_label"],
+            overall_score=overall_score,
+            arms_score=arms_score,
+            legs_score=legs_score,
+            best_novice_second=best_time_sec,
+            worst_novice_second=worst_time_sec,
+            problematic_joints_text=heatmap_data["problematic_joints_text"],
+        )
+
+        _create_result_for_session(
+            db=db,
+            session=new_session,
+            overall_score=overall_score,
+            arms_score=arms_score,
+            legs_score=legs_score,
+            feedback_summary=llm_feedback["summary"],
+            strengths_text=llm_feedback["strengths"],
+            improvements_text=llm_feedback["improvements"],
+            best_expert_file=overall_data["best_expert_file"],
+            best_novice_frame=part_scores["best_novice_frame"],
+            best_expert_frame=part_scores["best_expert_frame"],
+            worst_novice_frame=part_scores["worst_novice_frame"],
+            worst_expert_frame=part_scores["worst_expert_frame"],
+            problematic_joints_text=heatmap_data["problematic_joints_text"],
+            best_heatmap_url=best_heatmap_url,
+            worst_heatmap_url=worst_heatmap_url,
+        )
+        db.refresh(new_session)
+
+        return new_session
+
+    except Exception as e:
+        new_session.status = "failed"
+        new_session.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis pipeline failed: {str(e)}",
+        )
 
 
 @router.get("/", response_model=list[AnalysisSessionResponse])

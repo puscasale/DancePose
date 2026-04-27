@@ -18,7 +18,9 @@ from app.routes.results import router as results_router
 from app.routes.profile import router as profile_router
 from app.routes.progress import router as progress_router
 from app.routes.favorites import router as favorites_router
+from fastapi.staticfiles import StaticFiles
 from app.seed_data import seed_database
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -38,6 +40,7 @@ app.include_router(results_router)
 app.include_router(profile_router)
 app.include_router(progress_router)
 app.include_router(favorites_router)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 @app.get("/")

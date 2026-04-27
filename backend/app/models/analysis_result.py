@@ -23,6 +23,17 @@ class AnalysisResult(Base):
     strengths_text = Column(Text, nullable=True)
     improvements_text = Column(Text, nullable=True)
 
+    best_expert_file = Column(Text, nullable=True)
+
+    best_novice_frame = Column(Integer, nullable=True)
+    best_expert_frame = Column(Integer, nullable=True)
+    worst_novice_frame = Column(Integer, nullable=True)
+    worst_expert_frame = Column(Integer, nullable=True)
+
+    problematic_joints_text = Column(Text, nullable=True)
+    best_heatmap_url = Column(Text, nullable=True)
+    worst_heatmap_url = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("AnalysisSession")
