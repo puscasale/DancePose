@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../models/dance_move_model.dart';
+import '../../models/favorites_response_model.dart';
 import '../../services/dance_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'step_detail_screen.dart';
@@ -27,10 +28,68 @@ class _StepsScreenState extends State<StepsScreen> {
   final DanceService _danceService = DanceService();
   late Future<List<DanceMoveModel>> _movesFuture;
 
+  final Set<int> _favoriteMoveIds = {};
+  bool _favoritesLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _movesFuture = _danceService.getMovesByStyle(widget.styleId);
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await _danceService.getFavorites();
+      if (!mounted) return;
+
+      setState(() {
+        _favoriteMoveIds
+          ..clear()
+          ..addAll(favorites.moves.map((e) => e.moveId));
+        _favoritesLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _favoritesLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _toggleFavoriteMove(int moveId) async {
+    final isFavorite = _favoriteMoveIds.contains(moveId);
+
+    setState(() {
+      if (isFavorite) {
+        _favoriteMoveIds.remove(moveId);
+      } else {
+        _favoriteMoveIds.add(moveId);
+      }
+    });
+
+    try {
+      if (isFavorite) {
+        await _danceService.removeFavoriteMove(moveId);
+      } else {
+        await _danceService.addFavoriteMove(moveId);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (isFavorite) {
+          _favoriteMoveIds.add(moveId);
+        } else {
+          _favoriteMoveIds.remove(moveId);
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update favorite move.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -162,8 +221,8 @@ class _StepsScreenState extends State<StepsScreen> {
                       FutureBuilder<List<DanceMoveModel>>(
                         future: _movesFuture,
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
+                          if (snapshot.connectionState == ConnectionState.waiting ||
+                              !_favoritesLoaded) {
                             return const Center(
                               child: Padding(
                                 padding: EdgeInsets.only(top: 40),
@@ -195,6 +254,7 @@ class _StepsScreenState extends State<StepsScreen> {
                                           _movesFuture = _danceService
                                               .getMovesByStyle(widget.styleId);
                                         });
+                                        _loadFavorites();
                                       },
                                       child: const Text('Retry'),
                                     ),
@@ -217,6 +277,9 @@ class _StepsScreenState extends State<StepsScreen> {
                                   number: index + 1,
                                   title: move.name,
                                   accent: widget.accentColor,
+                                  isFavorite: _favoriteMoveIds.contains(move.id),
+                                  onToggleFavorite: () =>
+                                      _toggleFavoriteMove(move.id),
                                   onTap: () {
                                     Navigator.push(
                                       context,
@@ -254,12 +317,16 @@ class _StepCard extends StatelessWidget {
   final int number;
   final String title;
   final Color accent;
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
   final VoidCallback onTap;
 
   const _StepCard({
     required this.number,
     required this.title,
     required this.accent,
+    required this.isFavorite,
+    required this.onToggleFavorite,
     required this.onTap,
   });
 
@@ -311,7 +378,18 @@ class _StepCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onToggleFavorite,
+                icon: Icon(
+                  isFavorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isFavorite
+                      ? AppColors.highlight
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 4),
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: AppColors.textSecondary,

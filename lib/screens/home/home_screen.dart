@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+
 import '../../models/auth/user_model.dart';
+import '../../models/favorites_response_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/dance_service.dart';
 import '../../services/home_stats_service.dart';
 import '../../theme/app_colors.dart';
 import '../analysis/result_screen.dart';
 import '../analysis/start_dance_screen.dart';
 import '../learning/learning_styles_screen.dart';
+import '../learning/step_detail_screen.dart';
+import '../learning/steps_screen.dart';
 import '../welcome/widgets/background_glow.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,13 +23,16 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final VideoPlayerController _videoController;
+
   final AuthService _authService = AuthService();
   final HomeStatsService _homeStatsService = HomeStatsService();
+  final DanceService _danceService = DanceService();
 
   bool _isLoadingUser = true;
   UserModel? _currentUser;
 
   late Future<HomeDashboardData> _dashboardFuture;
+  late Future<FavoritesResponseModel> _favoritesFuture;
 
   @override
   void initState() {
@@ -43,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
     _dashboardFuture = _homeStatsService.getDashboardData();
+    _favoritesFuture = _danceService.getFavorites();
     _loadCurrentUser();
   }
 
@@ -67,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _refreshDashboard() async {
     setState(() {
       _dashboardFuture = _homeStatsService.getDashboardData();
+      _favoritesFuture = _danceService.getFavorites();
     });
   }
 
@@ -84,6 +94,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final parts = fullName.split(' ');
     return parts.first;
+  }
+
+  Color _getAccentColor(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return AppColors.secondary;
+      case 'Middle Hip-Hop':
+        return AppColors.primary;
+      case 'Street Jazz':
+        return AppColors.highlight;
+      default:
+        return AppColors.secondary;
+    }
+  }
+
+  IconData _getStyleIcon(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return Icons.graphic_eq_rounded;
+      case 'Middle Hip-Hop':
+        return Icons.bolt_rounded;
+      case 'Street Jazz':
+        return Icons.auto_awesome_rounded;
+      default:
+        return Icons.music_note_rounded;
+    }
+  }
+
+  void _openFavoriteStyle(FavoriteStyleItem style) {
+    final accent = _getAccentColor(style.styleName);
+    final icon = _getStyleIcon(style.styleName);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StepsScreen(
+          styleId: style.styleId,
+          styleName: style.styleName,
+          accentColor: accent,
+          styleIcon: icon,
+        ),
+      ),
+    );
+  }
+
+  void _openFavoriteMove(FavoriteMoveItem move) {
+    if (move.styleId == null || move.styleName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This move is missing style information.'),
+        ),
+      );
+      return;
+    }
+
+    final accent = _getAccentColor(move.styleName!);
+    final icon = _getStyleIcon(move.styleName!);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StepDetailsScreen(
+          styleId: move.styleId!,
+          moveId: move.moveId,
+          styleName: move.styleName!,
+          stepName: move.moveName,
+          accentColor: accent,
+          styleIcon: icon,
+        ),
+      ),
+    );
   }
 
   @override
@@ -293,20 +374,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(height: 18),
                                   Row(
                                     children: [
-                                      _InfoChip(
-                                        icon: Icons.star_rounded,
-                                        label: dashboard?.latestScore != null
-                                            ? 'Last score ${dashboard!.latestScore!.toStringAsFixed(1)}'
-                                            : 'No score yet',
-                                        color: AppColors.secondary,
+                                      Expanded(
+                                        child: _InfoChip(
+                                          icon: Icons.star_rounded,
+                                          label: dashboard?.latestScore != null
+                                              ? 'Last score ${dashboard!.latestScore!.toStringAsFixed(1)}'
+                                              : 'No score yet',
+                                          color: AppColors.secondary,
+                                        ),
                                       ),
                                       const SizedBox(width: 10),
-                                      _InfoChip(
-                                        icon: Icons.insights_rounded,
-                                        label: dashboard?.bestStyle != null
-                                            ? 'Best: ${dashboard!.bestStyle}'
-                                            : 'No data yet',
-                                        color: AppColors.highlight,
+                                      Expanded(
+                                        child: _InfoChip(
+                                          icon: Icons.insights_rounded,
+                                          label: dashboard?.bestStyle != null
+                                              ? 'Best: ${dashboard!.bestStyle}'
+                                              : 'No data yet',
+                                          color: AppColors.highlight,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -338,60 +423,32 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                             const SizedBox(height: 14),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SmallDashboardCard(
+                                    title: 'Sessions',
+                                    value: '${dashboard?.totalSessions ?? 0}',
+                                    icon: Icons.local_fire_department_rounded,
+                                    accent: AppColors.highlight,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(14),
-                                      color: AppColors.highlight.withValues(alpha: 0.14),
-                                    ),
-                                    child: const Icon(
-                                      Icons.local_fire_department_rounded,
-                                      color: AppColors.highlight,
-                                      size: 22,
-                                    ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _SmallDashboardCard(
+                                    title: 'Status',
+                                    value: snapshot.connectionState ==
+                                            ConnectionState.waiting
+                                        ? 'Loading'
+                                        : 'Synced',
+                                    icon: Icons.cloud_done_rounded,
+                                    accent: AppColors.secondary,
                                   ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Sessions',
-                                          style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${dashboard?.totalSessions ?? 0}',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 24),
-                            if (dashboard?.latestSession != null)
+                            if (dashboard?.latestSession != null) ...[
+                              const SizedBox(height: 24),
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(20),
@@ -460,6 +517,155 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                               ),
+                            ],
+                            const SizedBox(height: 24),
+                            FutureBuilder<FavoritesResponseModel>(
+                              future: _favoritesFuture,
+                              builder: (context, favoritesSnapshot) {
+                                if (favoritesSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface.withValues(alpha: 0.94),
+                                      borderRadius: BorderRadius.circular(26),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.08),
+                                      ),
+                                    ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.secondary,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                if (favoritesSnapshot.hasError) {
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface.withValues(alpha: 0.94),
+                                      borderRadius: BorderRadius.circular(26),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.08),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Could not load favorites.',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final favorites = favoritesSnapshot.data!;
+
+                                return Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface.withValues(alpha: 0.94),
+                                    borderRadius: BorderRadius.circular(26),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Your favorites',
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                        'Quick access to the styles and moves you saved.',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 13,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'Favorite styles',
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      if (favorites.styles.isEmpty)
+                                        const Text(
+                                          'No favorite styles yet.',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        )
+                                      else
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: favorites.styles
+                                              .map(
+                                                (style) => _FavoriteTag(
+                                                  label: style.styleName,
+                                                  color: AppColors.secondary,
+                                                  onTap: () =>
+                                                      _openFavoriteStyle(style),
+                                                ),
+                                              )
+                                              .toList(),
+                                        ),
+                                      const SizedBox(height: 18),
+                                      const Text(
+                                        'Favorite moves',
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      if (favorites.moves.isEmpty)
+                                        const Text(
+                                          'No favorite moves yet.',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        )
+                                      else
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: favorites.moves
+                                              .map(
+                                                (move) => _FavoriteTag(
+                                                  label: move.moveName,
+                                                  color: AppColors.highlight,
+                                                  onTap: () =>
+                                                      _openFavoriteMove(move),
+                                                ),
+                                              )
+                                              .toList(),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                             const SizedBox(height: 26),
                             const Text(
                               'Start here',
@@ -573,6 +779,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                       _MiniTag(
                                         label: 'House',
                                         color: AppColors.secondary,
+                                      ),
+                                      SizedBox(width: 8),
+                                      _MiniTag(
+                                        label: 'Beginner',
+                                        color: AppColors.highlight,
                                       ),
                                     ],
                                   ),
@@ -740,6 +951,8 @@ class _SmallDashboardCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 18,
@@ -779,7 +992,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Flexible(
+          Expanded(
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
@@ -791,6 +1004,47 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FavoriteTag extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FavoriteTag({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: color.withValues(alpha: 0.24),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -839,4 +1093,4 @@ class _NoStretchScrollBehavior extends ScrollBehavior {
   ) {
     return child;
   }
-} 
+}

@@ -19,3 +19,15 @@ class ProgressHistoryItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+class StyleAverageItem(BaseModel):
+    style_name: str
+    average_score: float
+
+
+class ProgressStatsResponse(BaseModel):
+    best_score_ever: float | None = None
+    total_sessions: int
+    most_practiced_move: str | None = None
+    last_activity: datetime | None = None
+    average_by_style: list[StyleAverageItem]

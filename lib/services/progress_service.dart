@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/config/api_config.dart';
 import '../models/progress_history_item.dart';
+import '../models/progress_stats_model.dart';
 import 'auth_service.dart';
 
 class ProgressService {
@@ -32,6 +33,27 @@ class ProgressService {
     if (response.statusCode == 200) {
       final List<dynamic> decoded = jsonDecode(response.body);
       return decoded.map((item) => ProgressHistoryItem.fromJson(item)).toList();
+    }
+
+    throw Exception(_extractErrorMessage(response.body));
+  }
+
+  Future<ProgressStatsModel> getStats() async {
+    final token = await _authService.getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('No access token found');
+    }
+
+    final response = await _client.get(
+      Uri.parse('${ApiConfig.baseUrl}/progress/stats'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return ProgressStatsModel.fromJson(jsonDecode(response.body));
     }
 
     throw Exception(_extractErrorMessage(response.body));

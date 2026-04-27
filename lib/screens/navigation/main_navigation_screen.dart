@@ -19,17 +19,20 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _currentIndex;
 
-  late final List<Widget> _pages = [
-    const HomeScreen(),
-    const ProgressScreen(),
-    const ProfileScreen(),
-  ];
+  int _homeVersion = 0;
+  int _profileVersion = 0;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
   }
+
+  List<Widget> get _pages => [
+        HomeScreen(key: ValueKey('home-$_homeVersion')),
+        const ProgressScreen(),
+        ProfileScreen(key: ValueKey('profile-$_profileVersion')),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +78,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   fontWeight: FontWeight.w600,
                 );
               }),
-              iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
+              iconTheme:
+                  WidgetStateProperty.resolveWith<IconThemeData>((states) {
                 if (states.contains(WidgetState.selected)) {
                   return const IconThemeData(
                     color: Colors.white,
@@ -96,6 +100,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             onDestinationSelected: (index) {
               setState(() {
                 _currentIndex = index;
+
+                if (index == 0) {
+                  _homeVersion++;
+                }
+
+                if (index == 2) {
+                  _profileVersion++;
+                }
               });
             },
             destinations: const [

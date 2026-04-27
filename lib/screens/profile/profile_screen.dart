@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../models/auth/user_model.dart';
+import '../../models/favorites_response_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/dance_service.dart';
 import '../../theme/app_colors.dart';
+import '../learning/step_detail_screen.dart';
+import '../learning/steps_screen.dart';
 import '../welcome/welcome_screen.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'edit_profile_screen.dart';
@@ -16,11 +21,14 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  final DanceService _danceService = DanceService();
 
   bool _isLoading = true;
   bool _isLoggingOut = false;
   bool _isDeleting = false;
+
   UserModel? _user;
+  FavoritesResponseModel? _favorites;
 
   @override
   void initState() {
@@ -31,11 +39,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUser() async {
     try {
       final user = await _authService.getCurrentUser();
+      final favorites = await _danceService.getFavorites();
 
       if (!mounted) return;
 
       setState(() {
         _user = user;
+        _favorites = favorites;
         _isLoading = false;
       });
     } catch (_) {
@@ -61,6 +71,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _user = updatedUser;
       });
+
+      await _loadUser();
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -208,6 +222,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         return level;
     }
+  }
+
+  Color _getAccentColor(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return AppColors.secondary;
+      case 'Middle Hip-Hop':
+        return AppColors.primary;
+      case 'Street Jazz':
+        return AppColors.highlight;
+      default:
+        return AppColors.secondary;
+    }
+  }
+
+  IconData _getStyleIcon(String styleName) {
+    switch (styleName) {
+      case 'House':
+        return Icons.graphic_eq_rounded;
+      case 'Middle Hip-Hop':
+        return Icons.bolt_rounded;
+      case 'Street Jazz':
+        return Icons.auto_awesome_rounded;
+      default:
+        return Icons.music_note_rounded;
+    }
+  }
+
+  void _openFavoriteStyle(FavoriteStyleItem style) {
+    final accent = _getAccentColor(style.styleName);
+    final icon = _getStyleIcon(style.styleName);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StepsScreen(
+          styleId: style.styleId,
+          styleName: style.styleName,
+          accentColor: accent,
+          styleIcon: icon,
+        ),
+      ),
+    );
+  }
+
+  void _openFavoriteMove(FavoriteMoveItem move) {
+    if (move.styleId == null || move.styleName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This move is missing style information.'),
+        ),
+      );
+      return;
+    }
+
+    final accent = _getAccentColor(move.styleName!);
+    final icon = _getStyleIcon(move.styleName!);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StepDetailsScreen(
+          styleId: move.styleId!,
+          moveId: move.moveId,
+          styleName: move.styleName!,
+          stepName: move.moveName,
+          accentColor: accent,
+          styleIcon: icon,
+        ),
+      ),
+    );
   }
 
   @override
@@ -406,15 +491,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _InfoTile(
                               icon: Icons.cake_outlined,
                               title: 'Age',
-                              value: _user?.age != null
-                                  ? '${_user!.age}'
-                                  : 'Not set',
+                              value: _user?.age != null ? '${_user!.age}' : 'Not set',
                             ),
                             const SizedBox(height: 12),
                             _InfoTile(
                               icon: Icons.auto_awesome_rounded,
                               title: 'Dance level',
                               value: _formatDanceLevel(_user?.danceLevel),
+                            ),
+                            const SizedBox(height: 22),
+                            const _SectionTitle('Favorites'),
+                            const SizedBox(height: 14),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Favorite styles',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (_favorites == null || _favorites!.styles.isEmpty)
+                                    const Text(
+                                      'No favorite styles yet',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    )
+                                  else
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: _favorites!.styles
+                                          .map(
+                                            (style) => _FavoriteTag(
+                                              label: style.styleName,
+                                              color: AppColors.secondary,
+                                              onTap: () =>
+                                                  _openFavoriteStyle(style),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  const SizedBox(height: 18),
+                                  const Text(
+                                    'Favorite moves',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (_favorites == null || _favorites!.moves.isEmpty)
+                                    const Text(
+                                      'No favorite moves yet',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    )
+                                  else
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: _favorites!.moves
+                                          .map(
+                                            (move) => _FavoriteTag(
+                                              label: move.moveName,
+                                              color: AppColors.highlight,
+                                              onTap: () =>
+                                                  _openFavoriteMove(move),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 24),
                             SizedBox(
@@ -484,7 +651,7 @@ class _ProfileLoadingView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 28),
-        Center(
+        const Center(
           child: Padding(
             padding: EdgeInsets.only(top: 40),
             child: CircularProgressIndicator(
@@ -539,6 +706,7 @@ class _InfoTile extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 46,
@@ -572,12 +740,54 @@ class _InfoTile extends StatelessWidget {
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FavoriteTag extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FavoriteTag({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: color.withValues(alpha: 0.24),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ),
     );
   }

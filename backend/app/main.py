@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
-from app.models import User, DanceStyle, DanceMove, AnalysisSession, AnalysisResult
+from app.models import (
+    User,
+    DanceStyle,
+    DanceMove,
+    AnalysisSession,
+    AnalysisResult,
+    FavoriteStyle,
+    FavoriteMove,
+)
 from app.routes.auth import router as auth_router
 from app.routes.styles import router as styles_router
 from app.routes.moves import router as moves_router
@@ -9,6 +17,7 @@ from app.routes.analysis import router as analysis_router
 from app.routes.results import router as results_router
 from app.routes.profile import router as profile_router
 from app.routes.progress import router as progress_router
+from app.routes.favorites import router as favorites_router
 from app.seed_data import seed_database
 
 Base.metadata.create_all(bind=engine)
@@ -28,6 +37,7 @@ app.include_router(analysis_router)
 app.include_router(results_router)
 app.include_router(profile_router)
 app.include_router(progress_router)
+app.include_router(favorites_router)
 
 
 @app.get("/")

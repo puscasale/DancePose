@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../models/dance_style_model.dart';
+import '../../models/favorites_response_model.dart';
 import '../../services/dance_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'steps_screen.dart';
@@ -16,10 +17,68 @@ class _LearningStylesScreenState extends State<LearningStylesScreen> {
   final DanceService _danceService = DanceService();
   late Future<List<DanceStyleModel>> _stylesFuture;
 
+  final Set<int> _favoriteStyleIds = {};
+  bool _favoritesLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _stylesFuture = _danceService.getStyles();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await _danceService.getFavorites();
+      if (!mounted) return;
+
+      setState(() {
+        _favoriteStyleIds
+          ..clear()
+          ..addAll(favorites.styles.map((e) => e.styleId));
+        _favoritesLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _favoritesLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _toggleFavoriteStyle(int styleId) async {
+    final isFavorite = _favoriteStyleIds.contains(styleId);
+
+    setState(() {
+      if (isFavorite) {
+        _favoriteStyleIds.remove(styleId);
+      } else {
+        _favoriteStyleIds.add(styleId);
+      }
+    });
+
+    try {
+      if (isFavorite) {
+        await _danceService.removeFavoriteStyle(styleId);
+      } else {
+        await _danceService.addFavoriteStyle(styleId);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (isFavorite) {
+          _favoriteStyleIds.add(styleId);
+        } else {
+          _favoriteStyleIds.remove(styleId);
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update favorite style.'),
+        ),
+      );
+    }
   }
 
   Color _getAccentColor(String styleName) {
@@ -123,8 +182,8 @@ class _LearningStylesScreenState extends State<LearningStylesScreen> {
                       FutureBuilder<List<DanceStyleModel>>(
                         future: _stylesFuture,
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
+                          if (snapshot.connectionState == ConnectionState.waiting ||
+                              !_favoritesLoaded) {
                             return const Center(
                               child: Padding(
                                 padding: EdgeInsets.only(top: 40),
@@ -153,9 +212,9 @@ class _LearningStylesScreenState extends State<LearningStylesScreen> {
                                     ElevatedButton(
                                       onPressed: () {
                                         setState(() {
-                                          _stylesFuture =
-                                              _danceService.getStyles();
+                                          _stylesFuture = _danceService.getStyles();
                                         });
+                                        _loadFavorites();
                                       },
                                       child: const Text('Retry'),
                                     ),
@@ -181,6 +240,8 @@ class _LearningStylesScreenState extends State<LearningStylesScreen> {
                                   accent: accent,
                                   icon: icon,
                                   difficulty: '5 moves',
+                                  isFavorite: _favoriteStyleIds.contains(style.id),
+                                  onToggleFavorite: () => _toggleFavoriteStyle(style.id),
                                   onTap: () {
                                     Navigator.push(
                                       context,
@@ -218,6 +279,8 @@ class _StyleCard extends StatelessWidget {
   final Color accent;
   final IconData icon;
   final String difficulty;
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
   final VoidCallback onTap;
 
   const _StyleCard({
@@ -226,6 +289,8 @@ class _StyleCard extends StatelessWidget {
     required this.accent,
     required this.icon,
     required this.difficulty,
+    required this.isFavorite,
+    required this.onToggleFavorite,
     required this.onTap,
   });
 
@@ -262,6 +327,7 @@ class _StyleCard extends StatelessWidget {
             ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 78,
@@ -281,13 +347,30 @@ class _StyleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: onToggleFavorite,
+                          icon: Icon(
+                            isFavorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            color: isFavorite
+                                ? AppColors.highlight
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
