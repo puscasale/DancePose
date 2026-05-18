@@ -235,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: const Text(
-                                  'Forgot password?',
+                                  '',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,

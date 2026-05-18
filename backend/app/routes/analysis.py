@@ -17,11 +17,25 @@ from app.ai.classify import classify_fusion_vit, resolve_predicted_ids
 from app.ai.scoring import compute_overall_ai_score, compute_body_part_scores
 from app.ai.heatmap import generate_session_heatmaps
 from app.ai.llm_feedback import generate_llm_feedback
+from app.ai.storage import upload_file_to_bucket
+from app.core.config import settings
+from pathlib import Path
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+def _safe_delete_file(path: str | None):
+    if not path:
+        return
+
+    try:
+        file_path = Path(path)
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink()
+            print(f"[CLEANUP] deleted local file: {file_path}")
+    except Exception as e:
+        print(f"[CLEANUP WARNING] could not delete {path}: {e}")
 
 
 def _create_result_for_session(
@@ -140,17 +154,21 @@ def upload_analysis_video(
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
+    preprocessing_info = None
+    heatmap_data = None
 
     try:
         preprocessing_info = run_preprocessing_pipeline(
             video_path=saved_path,
             session_id=new_session.id,
         )
+        print("[STEP] preprocessing done")
 
         classification = classify_fusion_vit(
             skeleton_path=preprocessing_info["model_input_path"],
             video_feature_path=preprocessing_info["video_feature_path"],
         )
+        print("[STEP] classification done")
 
         predicted_style_id, predicted_move_id = resolve_predicted_ids(
             db,
@@ -194,11 +212,13 @@ def upload_analysis_video(
             selected_style_name=selected_style_name,
             selected_move_name=selected_move_name,
         )
+        print("[STEP] overall scoring done")
 
         part_scores = compute_body_part_scores(
             novice_normalized_full_path=preprocessing_info["normalized_full_path"],
             expert_normalized_full_path=overall_data["best_expert_path"],
         )
+        print("[STEP] body part scoring done")
 
         overall_ai_score_raw = overall_data["overall_ai_score"]
         arms_score_raw = part_scores["arms_score_raw"]
@@ -223,10 +243,37 @@ def upload_analysis_video(
             worst_expert_frame=part_scores["worst_expert_frame"],
             session_id=new_session.id,
         )
+        print("[STEP] heatmaps generated")
 
-        base_url = str(request.base_url).rstrip("/")
-        best_heatmap_url = f"{base_url}/media/heatmaps/session_{new_session.id}_best_heatmap.png"
-        worst_heatmap_url = f"{base_url}/media/heatmaps/session_{new_session.id}_worst_heatmap.png"
+        print("SUPABASE_URL =", repr(settings.SUPABASE_URL))
+        print("SUPABASE_VIDEOS_BUCKET =", repr(settings.SUPABASE_VIDEOS_BUCKET))
+        print("SUPABASE_HEATMAPS_BUCKET =", repr(settings.SUPABASE_HEATMAPS_BUCKET))
+        print("SUPABASE_KEY exists =", bool(settings.SUPABASE_KEY))
+
+        video_public_url = upload_file_to_bucket(
+            local_file_path=saved_path,
+            bucket_name=settings.SUPABASE_VIDEOS_BUCKET,
+            remote_path=f"user_{current_user.id}/session_{new_session.id}/original{ext}",
+        )
+        print("[STEP] video uploaded to supabase")
+
+        best_heatmap_url = upload_file_to_bucket(
+            local_file_path=heatmap_data["best_heatmap_path"],
+            bucket_name=settings.SUPABASE_HEATMAPS_BUCKET,
+            remote_path=f"user_{current_user.id}/session_{new_session.id}/best_heatmap.png",
+        )
+        print("[STEP] best heatmap uploaded")
+
+        worst_heatmap_url = upload_file_to_bucket(
+            local_file_path=heatmap_data["worst_heatmap_path"],
+            bucket_name=settings.SUPABASE_HEATMAPS_BUCKET,
+            remote_path=f"user_{current_user.id}/session_{new_session.id}/worst_heatmap.png",
+        )
+        print("[STEP] worst heatmap uploaded")
+
+        new_session.input_video_path = video_public_url
+        db.commit()
+        db.refresh(new_session)
 
         best_time_sec = part_scores["best_novice_frame"] / 30.0
         worst_time_sec = part_scores["worst_novice_frame"] / 30.0
@@ -240,6 +287,7 @@ def upload_analysis_video(
             worst_novice_second=worst_time_sec,
             problematic_joints_text=heatmap_data["problematic_joints_text"],
         )
+        print("[STEP] llm feedback generated")
 
         _create_result_for_session(
             db=db,
@@ -264,6 +312,9 @@ def upload_analysis_video(
         return new_session
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+
         new_session.status = "failed"
         new_session.completed_at = datetime.now(timezone.utc)
         db.commit()
@@ -272,6 +323,17 @@ def upload_analysis_video(
             status_code=500,
             detail=f"Analysis pipeline failed: {str(e)}",
         )
+    finally:
+        _safe_delete_file(saved_path)
+
+        if preprocessing_info:
+            _safe_delete_file(preprocessing_info.get("model_input_path"))
+            _safe_delete_file(preprocessing_info.get("video_feature_path"))
+            _safe_delete_file(preprocessing_info.get("normalized_full_path"))
+
+        if heatmap_data:
+            _safe_delete_file(heatmap_data.get("best_heatmap_path"))
+            _safe_delete_file(heatmap_data.get("worst_heatmap_path"))
 
 
 @router.get("/", response_model=list[AnalysisSessionResponse])

@@ -1,6 +1,9 @@
-import os
 import time
+
 from google import genai
+
+from app.core.config import settings
+
 
 _client = None
 
@@ -13,18 +16,31 @@ MODEL_CANDIDATES = [
 
 def _get_client():
     global _client
+
     if _client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = settings.gemini_api_key
+
         if not api_key:
-            raise ValueError("GEMINI_API_KEY is not set")
+            return None
+
         _client = genai.Client(api_key=api_key)
+
     return _client
 
 
 def _parse_feedback_text(text: str) -> dict:
-    summary = "The execution is generally recognizable, with one body region performing more consistently than the other."
-    strengths = "The stronger segment of the body contributes most to the clarity of the movement. The best moment suggests that the movement can be executed more cleanly."
-    improvements = "The weaker body region should be the main focus in future practice. Greater consistency is needed around the weakest moment."
+    summary = (
+        "The execution is generally recognizable, with one body region performing "
+        "more consistently than the other."
+    )
+    strengths = (
+        "The stronger segment of the body contributes most to the clarity of the movement. "
+        "The best moment suggests that the movement can be executed more cleanly."
+    )
+    improvements = (
+        "The weaker body region should be the main focus in future practice. "
+        "Greater consistency is needed around the weakest moment."
+    )
 
     try:
         parts = text.split("STRENGTHS:")
@@ -37,6 +53,7 @@ def _parse_feedback_text(text: str) -> dict:
         summary = summary_part or summary
         strengths = strengths_part or strengths
         improvements = improvements_part or improvements
+
     except Exception:
         if text.strip():
             summary = text.strip()
@@ -59,18 +76,23 @@ def _fallback_feedback(
     weaker_area = "upper body" if legs_score >= arms_score else "lower body"
 
     summary = (
-        f"The movement is recognizable as {predicted_label}, with the {stronger_area} showing better consistency than the {weaker_area}. "
-        f"The main opportunity for improvement is to make the weaker region more controlled and more stable throughout the sequence."
+        f"The movement is recognizable as {predicted_label}, with the {stronger_area} "
+        f"showing better consistency than the {weaker_area}. "
+        f"The main opportunity for improvement is to make the weaker region more "
+        f"controlled and more stable throughout the sequence."
     )
 
     strengths = (
         f"The {stronger_area} contributes most to the clarity of the execution. "
-        "The best detected moment shows that the movement can be performed with better structure and control."
+        "The best detected moment shows that the movement can be performed with "
+        "better structure and control."
     )
 
     improvements = (
-        f"Practice should focus on the {weaker_area}, especially around the least stable part of the sequence. "
-        f"Pay extra attention to these joints: {problematic_joints_text or 'the most unstable joints'}."
+        f"Practice should focus on the {weaker_area}, especially around the least "
+        f"stable part of the sequence. "
+        f"Pay extra attention to these joints: "
+        f"{problematic_joints_text or 'the most unstable joints'}."
     )
 
     return {
@@ -90,6 +112,17 @@ def generate_llm_feedback(
     problematic_joints_text: str | None,
 ) -> dict:
     client = _get_client()
+
+    if client is None:
+        print("[LLM FEEDBACK FALLBACK] GEMINI_API_KEY is not set. Using local fallback feedback.")
+
+        return _fallback_feedback(
+            predicted_label=predicted_label,
+            overall_score=overall_score,
+            arms_score=arms_score,
+            legs_score=legs_score,
+            problematic_joints_text=problematic_joints_text,
+        )
 
     stronger_area = "legs" if legs_score >= arms_score else "arms"
     weaker_area = "arms" if legs_score >= arms_score else "legs"
@@ -145,9 +178,12 @@ Write exactly 2 short sentences in one paragraph. Mention the main technical foc
                     model=model_name,
                     contents=prompt,
                 )
+
                 text = (response.text or "").strip()
+
                 if text:
                     return _parse_feedback_text(text)
+
             except Exception as e:
                 errors.append(f"{model_name} attempt {attempt + 1}: {e}")
                 time.sleep(2)

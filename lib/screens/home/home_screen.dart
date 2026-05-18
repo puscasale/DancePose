@@ -58,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadCurrentUser() async {
     try {
       final user = await _authService.getCurrentUser();
+
       if (!mounted) return;
 
       setState(() {
@@ -74,10 +75,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshDashboard() async {
+    final dashboardFuture = _homeStatsService.getDashboardData();
+    final favoritesFuture = _danceService.getFavorites();
+
     setState(() {
-      _dashboardFuture = _homeStatsService.getDashboardData();
-      _favoritesFuture = _danceService.getFavorites();
+      _dashboardFuture = dashboardFuture;
+      _favoritesFuture = favoritesFuture;
     });
+
+    try {
+      await Future.wait<Object?>([
+        dashboardFuture,
+        favoritesFuture,
+      ]);
+    } catch (_) {
+      // Errors are handled by FutureBuilder in the UI.
+    }
+  }
+
+  Future<void> _openPageAndRefresh(Widget page) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => page,
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _refreshDashboard();
   }
 
   @override
@@ -94,6 +120,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final parts = fullName.split(' ');
     return parts.first;
+  }
+
+  String _formatDanceLevel(String? level) {
+    if (level == null || level.trim().isEmpty) {
+      return 'Beginner';
+    }
+
+    final normalized = level.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'beginner':
+        return 'Beginner';
+      case 'intermediate':
+        return 'Intermediate';
+      case 'advanced':
+        return 'Advanced';
+      default:
+        return level.trim();
+    }
   }
 
   Color _getAccentColor(String styleName) {
@@ -122,11 +167,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openFavoriteStyle(FavoriteStyleItem style) {
+  Future<void> _openFavoriteStyle(FavoriteStyleItem style) async {
     final accent = _getAccentColor(style.styleName);
     final icon = _getStyleIcon(style.styleName);
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => StepsScreen(
@@ -137,9 +182,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    if (!mounted) return;
+
+    await _refreshDashboard();
   }
 
-  void _openFavoriteMove(FavoriteMoveItem move) {
+  Future<void> _openFavoriteMove(FavoriteMoveItem move) async {
     if (move.styleId == null || move.styleName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -152,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final accent = _getAccentColor(move.styleName!);
     final icon = _getStyleIcon(move.styleName!);
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => StepDetailsScreen(
@@ -165,6 +214,38 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    if (!mounted) return;
+
+    await _refreshDashboard();
+  }
+
+  Future<void> _openLatestResult(HomeDashboardData dashboard) async {
+    final latestSession = dashboard.latestSession;
+
+    if (latestSession == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No latest result available yet.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          analysisSessionId: latestSession.sessionId,
+          styleName: latestSession.styleName ?? 'Auto-detect',
+          stepName: latestSession.moveName ?? 'Predicted move',
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _refreshDashboard();
   }
 
   @override
@@ -222,8 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           fit: BoxFit.contain,
                                           width: 46,
                                           height: 46,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
+                                          errorBuilder: (context, error, stackTrace) {
                                             return const Icon(
                                               Icons.music_note_rounded,
                                               color: AppColors.primary,
@@ -254,8 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               height: 18,
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withValues(alpha: 0.08),
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
+                                                borderRadius: BorderRadius.circular(999),
                                               ),
                                             )
                                           : Text(
@@ -436,12 +515,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: _SmallDashboardCard(
-                                    title: 'Status',
-                                    value: snapshot.connectionState ==
-                                            ConnectionState.waiting
+                                    title: 'Level',
+                                    value: _isLoadingUser
                                         ? 'Loading'
-                                        : 'Synced',
-                                    icon: Icons.cloud_done_rounded,
+                                        : _formatDanceLevel(_currentUser?.danceLevel),
+                                    icon: Icons.trending_up_rounded,
                                     accent: AppColors.secondary,
                                   ),
                                 ),
@@ -483,23 +561,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       width: double.infinity,
                                       child: ElevatedButton.icon(
                                         onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => ResultScreen(
-                                                analysisSessionId:
-                                                    dashboard.latestSession!.sessionId,
-                                                styleName: dashboard.latestSession!
-                                                        .styleName ??
-                                                    'Auto-detect',
-                                                stepName: dashboard.latestSession!
-                                                        .moveName ??
-                                                    'Predicted move',
-                                              ),
-                                            ),
-                                          );
+                                          _openLatestResult(dashboard);
                                         },
-                                        icon: const Icon(Icons.play_arrow_rounded),
+                                        icon: const Icon(Icons.assessment_rounded),
                                         label: const Text('Open latest result'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.primary,
@@ -508,8 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             vertical: 16,
                                           ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(18),
+                                            borderRadius: BorderRadius.circular(18),
                                           ),
                                         ),
                                       ),
@@ -622,8 +685,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 (style) => _FavoriteTag(
                                                   label: style.styleName,
                                                   color: AppColors.secondary,
-                                                  onTap: () =>
-                                                      _openFavoriteStyle(style),
+                                                  onTap: () {
+                                                    _openFavoriteStyle(style);
+                                                  },
                                                 ),
                                               )
                                               .toList(),
@@ -655,8 +719,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 (move) => _FavoriteTag(
                                                   label: move.moveName,
                                                   color: AppColors.highlight,
-                                                  onTap: () =>
-                                                      _openFavoriteMove(move),
+                                                  onTap: () {
+                                                    _openFavoriteMove(move);
+                                                  },
                                                 ),
                                               )
                                               .toList(),
@@ -683,29 +748,21 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: Icons.school_rounded,
                               accent: AppColors.secondary,
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const LearningStylesScreen(),
-                                  ),
+                                _openPageAndRefresh(
+                                  const LearningStylesScreen(),
                                 );
                               },
                             ),
                             const SizedBox(height: 16),
                             _FeatureCard(
-                              title: 'Start Dance',
+                              title: 'Dance Now',
                               subtitle:
                                   'Upload or record a video and get an instant performance report.',
                               icon: Icons.play_circle_fill_rounded,
                               accent: AppColors.primary,
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const StartDanceScreen(),
-                                  ),
+                                _openPageAndRefresh(
+                                  const StartDanceScreen(),
                                 );
                               },
                             ),

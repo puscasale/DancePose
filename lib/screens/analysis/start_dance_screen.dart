@@ -4,6 +4,8 @@ import '../../services/analysis_service.dart';
 import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'video_review_screen.dart';
+import 'camera_record_screen.dart';
+
 
 class StartDanceScreen extends StatefulWidget {
   const StartDanceScreen({super.key});
@@ -88,41 +90,45 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
   }
 
   Future<void> _recordWithCamera() async {
-    if (_isBusy) return;
+  if (_isBusy) return;
 
-    setState(() {
-      _isBusy = true;
-    });
+  setState(() {
+    _isBusy = true;
+  });
 
-    try {
-      final XFile? recordedVideo = await _picker.pickVideo(
-        source: ImageSource.camera,
+  try {
+    final XFile? recordedVideo = await Navigator.push<XFile?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CameraRecordScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (recordedVideo != null) {
+      await _openReviewScreen(
+        videoFile: recordedVideo,
+        sourceType: 'camera',
+        sourceLabel: 'Camera recording',
       );
+    }
+  } catch (_) {
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      if (recordedVideo != null) {
-        await _openReviewScreen(
-          videoFile: recordedVideo,
-          sourceType: 'camera',
-          sourceLabel: 'Camera recording',
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the camera.'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBusy = false;
-        });
-      }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not open the camera.'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isBusy = false;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +174,7 @@ class _StartDanceScreenState extends State<StartDanceScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Start Dance',
+                                  'Dance Now',
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 13,

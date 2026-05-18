@@ -6,6 +6,12 @@ import '../../theme/app_colors.dart';
 import '../../services/analysis_service.dart';
 import '../welcome/widgets/background_glow.dart';
 import '../analysis/video_review_screen.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:saver_gallery/saver_gallery.dart';
+import 'dart:typed_data';
+import '../analysis/camera_record_screen.dart';
 
 class StepDetailsScreen extends StatefulWidget {
   final int styleId;
@@ -121,6 +127,80 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
 
     return 'assets/videos/featured_move.mp4';
   }
+
+  Future<void> _downloadReferenceVideo() async {
+  if (_isBusy) return;
+
+  setState(() {
+    _isBusy = true;
+  });
+
+  try {
+    final String assetPath = _getVideoPath(widget.styleName, widget.stepName);
+
+    final ByteData data = await rootBundle.load(assetPath);
+    final Uint8List bytes = data.buffer.asUint8List();
+
+    final Directory tempDir = await getTemporaryDirectory();
+
+    final String safeStyleName = widget.styleName
+        .toLowerCase()
+        .replaceAll(' ', '_')
+        .replaceAll('-', '_');
+
+    final String safeStepName = widget.stepName
+        .toLowerCase()
+        .replaceAll(' ', '_')
+        .replaceAll('-', '_')
+        .replaceAll('é', 'e')
+        .replaceAll('è', 'e')
+        .replaceAll('à', 'a')
+        .replaceAll('ç', 'c');
+
+    final File tempFile = File(
+      '${tempDir.path}/dancepose_${safeStyleName}_$safeStepName.mp4',
+    );
+
+    await tempFile.writeAsBytes(bytes, flush: true);
+
+    final SaveResult result = await SaverGallery.saveFile(
+      filePath: tempFile.path,
+      fileName: 'dancepose_${safeStyleName}_$safeStepName.mp4',
+      androidRelativePath: 'Movies/DancePose',
+      skipIfExists: false,
+    );
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video saved to your gallery.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save the video.'),
+        ),
+      );
+    }
+  } catch (_) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not download the video.'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isBusy = false;
+      });
+    }
+  }
+}
 
   String _getStepDescription(String styleName, String stepName) {
     if (styleName == 'House') {
@@ -245,42 +325,45 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
   }
 
   Future<void> _recordVideoWithCamera() async {
-    if (_isBusy) return;
+  if (_isBusy) return;
 
-    setState(() {
-      _isBusy = true;
-    });
+  setState(() {
+    _isBusy = true;
+  });
 
-    try {
-      final XFile? recordedVideo = await _picker.pickVideo(
-        source: ImageSource.camera,
+  try {
+    final XFile? recordedVideo = await Navigator.push<XFile?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CameraRecordScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (recordedVideo != null) {
+      await _openReviewScreen(
+        videoFile: recordedVideo,
+        sourceType: 'camera',
+        sourceLabel: 'Camera recording',
       );
+    }
+  } catch (_) {
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      if (recordedVideo != null) {
-        await _openReviewScreen(
-          videoFile: recordedVideo,
-          sourceType: 'camera',
-          sourceLabel: 'Camera recording',
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the camera.'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBusy = false;
-        });
-      }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not open the camera.'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isBusy = false;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -357,22 +440,43 @@ class _StepDetailsScreenState extends State<StepDetailsScreen> {
                       ),
                       const SizedBox(height: 22),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(26),
-                        child: AspectRatio(
-                          aspectRatio: 16 / 9,
-                          child: (_chewieController != null &&
-                                  _videoController.value.isInitialized)
-                              ? Chewie(controller: _chewieController!)
-                              : Container(
-                                  color: const Color(0xFF0E1528),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: AppColors.secondary,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ),
+  borderRadius: BorderRadius.circular(26),
+  child: AspectRatio(
+    aspectRatio: 16 / 9,
+    child: (_chewieController != null &&
+            _videoController.value.isInitialized)
+        ? Chewie(controller: _chewieController!)
+        : Container(
+            color: const Color(0xFF0E1528),
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.secondary,
+              ),
+            ),
+          ),
+  ),
+),
+const SizedBox(height: 12),
+SizedBox(
+  width: double.infinity,
+  child: OutlinedButton.icon(
+    onPressed: _isBusy ? null : _downloadReferenceVideo,
+    icon: const Icon(Icons.download_rounded),
+    label: const Text('Download tutorial video'),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: AppColors.textPrimary,
+      side: BorderSide(
+        color: Colors.white.withValues(alpha: 0.14),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 15),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      backgroundColor: AppColors.surface.withValues(alpha: 0.35),
+    ),
+  ),
+),
+const SizedBox(height: 22),
                       const SizedBox(height: 22),
                       Container(
                         width: double.infinity,

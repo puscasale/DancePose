@@ -53,11 +53,13 @@ class _VideoReviewScreenState extends State<VideoReviewScreen> {
       await _controller.play();
 
       if (!mounted) return;
+
       setState(() {
         _isReady = true;
       });
     } catch (_) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not load the selected video.'),
@@ -73,38 +75,22 @@ class _VideoReviewScreenState extends State<VideoReviewScreen> {
       _isSubmitting = true;
     });
 
-    try {
-      final session = await widget.onConfirm();
+    final analysisFuture = widget.onConfirm();
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProcessingScreen(
-            analysisSessionId: session.id,
-            styleName: widget.styleName,
-            stepName: widget.stepName,
-            sourceLabel: widget.sourceLabel,
-            filePath: widget.videoPath,
-          ),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProcessingScreen(
+          analysisFuture: analysisFuture,
+          styleName: widget.styleName,
+          stepName: widget.stepName,
+          sourceLabel: widget.sourceLabel,
+          filePath: widget.videoPath,
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
-      );
-
-      setState(() {
-        _isSubmitting = false;
-      });
-    }
+      ),
+    );
   }
 
   @override
@@ -197,7 +183,9 @@ class _VideoReviewScreenState extends State<VideoReviewScreen> {
                         _InstructionLine('Keep your full body visible in the frame.'),
                         _InstructionLine('Try to record only one move at a time.'),
                         _InstructionLine('Use stable camera placement and good lighting.'),
-                        _InstructionLine('If the clip includes extra seconds, you can record again for a cleaner analysis.'),
+                        _InstructionLine(
+                          'If the clip includes extra seconds, you can record again for a cleaner analysis.',
+                        ),
                       ],
                     ),
                   ),
@@ -267,7 +255,7 @@ class _VideoReviewScreenState extends State<VideoReviewScreen> {
                             )
                           : const Icon(Icons.check_circle_outline_rounded),
                       label: Text(
-                        _isSubmitting ? 'Starting analysis...' : 'Use This Video',
+                        _isSubmitting ? 'Opening analysis...' : 'Use This Video',
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,

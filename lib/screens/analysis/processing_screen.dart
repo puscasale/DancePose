@@ -1,12 +1,14 @@
-import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import '../../models/analysis_session_model.dart';
 import '../../theme/app_colors.dart';
 import '../welcome/widgets/background_glow.dart';
 import 'result_screen.dart';
 
 class ProcessingScreen extends StatefulWidget {
-  final int analysisSessionId;
+  final Future<AnalysisSessionModel> analysisFuture;
   final String styleName;
   final String stepName;
   final String sourceLabel;
@@ -14,7 +16,7 @@ class ProcessingScreen extends StatefulWidget {
 
   const ProcessingScreen({
     super.key,
-    required this.analysisSessionId,
+    required this.analysisFuture,
     required this.styleName,
     required this.stepName,
     required this.sourceLabel,
@@ -29,16 +31,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   late final AnimationController _scanController;
-  Timer? _statusTimer;
-  Timer? _navigationTimer;
-  int _statusIndex = 0;
 
-  final List<String> _statuses = const [
-    'Extracting frames...',
-    'Detecting body joints...',
-    'Building pose skeleton...',
-    'Preparing AI analysis...',
-  ];
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -54,32 +48,36 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       duration: const Duration(milliseconds: 4200),
     )..repeat();
 
-    _statusTimer = Timer.periodic(const Duration(milliseconds: 1600), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _statusIndex = (_statusIndex + 1) % _statuses.length;
-      });
-    });
+    _waitForAnalysis();
+  }
 
-    _navigationTimer = Timer(const Duration(seconds: 6), () {
+  Future<void> _waitForAnalysis() async {
+    try {
+      final session = await widget.analysisFuture;
+
       if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => ResultScreen(
-            analysisSessionId: widget.analysisSessionId,
+            analysisSessionId: session.id,
             styleName: widget.styleName,
             stepName: widget.stepName,
           ),
         ),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
   void dispose() {
-    _statusTimer?.cancel();
-    _navigationTimer?.cancel();
     _pulseController.dispose();
     _scanController.dispose();
     super.dispose();
@@ -87,6 +85,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bool hasError = _errorMessage != null;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -98,11 +98,11 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 children: [
                   const SizedBox(height: 22),
                   const Text(
-                    'Analyzing your movement',
+                    'Analyzing now',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -126,8 +126,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                   ),
                   const Spacer(),
                   SizedBox(
-                    width: 310,
-                    height: 310,
+                    width: 380,
+                    height: 380,
                     child: AnimatedBuilder(
                       animation: Listenable.merge([
                         _pulseController,
@@ -143,63 +143,60 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                       },
                     ),
                   ),
-                  const SizedBox(height: 30),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 350),
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 0.15),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Text(
-                      _statuses[_statusIndex],
-                      key: ValueKey(_statuses[_statusIndex]),
+                  const SizedBox(height: 34),
+                  if (!hasError) ...[
+                    const Text(
+                      'Please wait while your video is being processed.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    const SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Analysis failed',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.highlight,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _errorMessage!,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        height: 1.5,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'We are extracting pose keypoints and preparing the motion sequence for AI evaluation.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 26),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: (_scanController.value * 0.85) + 0.1,
-                      minHeight: 8,
-                      backgroundColor: const Color(0xFF1A2137),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.secondary,
+                    const SizedBox(height: 20),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Go back',
+                        style: TextStyle(
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${(10 + (_scanController.value * 85)).toInt()}%',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  ],
                   const Spacer(),
                 ],
               ),
@@ -297,6 +294,7 @@ class _ProcessingSkeletonPainter extends CustomPainter {
     }
 
     final visibleConnections = (connections.length * reveal).floor();
+
     for (int i = 0; i < visibleConnections; i++) {
       canvas.drawLine(
         points[connections[i][0]],
@@ -320,6 +318,7 @@ class _ProcessingSkeletonPainter extends CustomPainter {
 
     final scanY = size.height * progress;
     final scanRect = Rect.fromLTWH(0, scanY - 18, size.width, 36);
+
     final scanGradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -329,6 +328,7 @@ class _ProcessingSkeletonPainter extends CustomPainter {
         Colors.transparent,
       ],
     );
+
     final scanPaint = Paint()..shader = scanGradient.createShader(scanRect);
     canvas.drawRect(scanRect, scanPaint);
 
