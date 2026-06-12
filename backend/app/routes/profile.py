@@ -29,7 +29,10 @@ def update_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    current_user.full_name = profile_data.full_name.strip()
+    full_name = profile_data.full_name.strip()
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Full name cannot be empty")
+    current_user.full_name = full_name
     current_user.age = profile_data.age
     current_user.dance_level = profile_data.dance_level
 
