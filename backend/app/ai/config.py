@@ -20,3 +20,5 @@ NUM_JOINTS = 17
 VIDEO_FEAT_DIM = 512
 MOVENET_INPUT_SIZE = 256
 R3D_NUM_FRAMES = 16
+
+FINAL_MODEL_TYPE = "vit"  # options: "vit", "fusion"

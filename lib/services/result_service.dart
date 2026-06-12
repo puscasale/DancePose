@@ -19,7 +19,7 @@ class ResultService {
     final token = await _authService.getToken();
 
     if (token == null || token.isEmpty) {
-      throw Exception('No access token found');
+      throw Exception('Your session has expired. Please log in again.');
     }
 
     final response = await _client.get(

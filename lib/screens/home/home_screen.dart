@@ -89,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         favoritesFuture,
       ]);
     } catch (_) {
-      // Errors are handled by FutureBuilder in the UI.
+      // Errors are handled by FutureBuilder in the UI
     }
   }
 

@@ -38,13 +38,13 @@ Path("media").mkdir(exist_ok=True)
 Path("uploads").mkdir(exist_ok=True)
 
 
-from app.main import app  # noqa: E402
-from app.core.database import Base, engine, SessionLocal, get_db  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
-from app.routes.dependencies import get_current_user  # noqa: E402
-from app.models.user import User  # noqa: E402
-from app.models.dance_style import DanceStyle  # noqa: E402
-from app.models.dance_move import DanceMove  # noqa: E402
+from app.main import app  
+from app.core.database import Base, engine, SessionLocal, get_db  
+from app.core.security import hash_password  
+from app.routes.dependencies import get_current_user  
+from app.models.user import User 
+from app.models.dance_style import DanceStyle 
+from app.models.dance_move import DanceMove  
 
 
 def _model_kwargs(model_class, values: dict) -> dict:

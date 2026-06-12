@@ -1,5 +1,7 @@
 from app.core.database import SessionLocal
 from app.models.user import User
+from app.models.analysis_session import AnalysisSession
+from app.models.analysis_result import AnalysisResult
 
 
 def test_get_my_profile(client):
@@ -123,5 +125,60 @@ def test_delete_my_account(client):
         user = db.query(User).filter(User.id == 1).first()
         assert user is None
 
+    finally:
+        db.close()
+
+def test_delete_my_account_with_existing_sessions_and_results(client):
+    db = SessionLocal()
+    try:
+        session = AnalysisSession(
+            user_id=1,
+            mode="auto",
+            source_type="gallery",
+            status="completed",
+            input_video_path="https://supabase.test/video.mp4",
+            selected_style_id=1,
+            selected_move_id=1,
+            predicted_style_id=1,
+            predicted_move_id=1,
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+        result = AnalysisResult(
+            analysis_session_id=session.id,
+            overall_score=8.0,
+            arms_score=7.0,
+            legs_score=9.0,
+            feedback_summary="Good execution.",
+            strengths_text="Good timing.",
+            improvements_text="Improve arm control.",
+        )
+        db.add(result)
+        db.commit()
+
+        session_id = session.id
+    finally:
+        db.close()
+
+    response = client.delete("/profile/me")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Account deleted successfully"
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == 1).first()
+        deleted_session = db.query(AnalysisSession).filter(AnalysisSession.id == session_id).first()
+        deleted_result = (
+            db.query(AnalysisResult)
+            .filter(AnalysisResult.analysis_session_id == session_id)
+            .first()
+        )
+
+        assert user is None
+        assert deleted_session is None
+        assert deleted_result is None
     finally:
         db.close()

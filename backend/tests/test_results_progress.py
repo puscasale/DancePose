@@ -203,3 +203,65 @@ def test_progress_stats_returns_expected_values(client):
     assert len(data["average_by_style"]) == 1
     assert data["average_by_style"][0]["style_name"] == "House"
     assert data["average_by_style"][0]["average_score"] == 8.5
+
+def test_get_result_for_session_handles_missing_predicted_move(client):
+    db = SessionLocal()
+    try:
+        session = AnalysisSession(
+            user_id=1,
+            mode="auto",
+            source_type="gallery",
+            status="completed",
+            input_video_path="https://supabase.test/video.mp4",
+            selected_style_id=1,
+            selected_move_id=1,
+            predicted_style_id=1,
+            predicted_move_id=999999,
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+        session_id = session.id
+    finally:
+        db.close()
+
+    create_response = client.post(
+        "/results/",
+        json=_create_result_payload(session_id),
+    )
+
+    assert create_response.status_code == 201
+
+    response = client.get(f"/results/session/{session_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["analysis_session_id"] == session_id
+    assert data["predicted_style_name"] == "House"
+    assert data["predicted_move_name"] is None
+
+def test_get_result_for_session_returns_404_when_result_missing(client):
+    db = SessionLocal()
+    try:
+        session = AnalysisSession(
+            user_id=1,
+            mode="auto",
+            source_type="gallery",
+            status="completed",
+            input_video_path="https://supabase.test/video.mp4",
+            selected_style_id=1,
+            selected_move_id=1,
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+        session_id = session.id
+    finally:
+        db.close()
+
+    response = client.get(f"/results/session/{session_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Result not found"

@@ -1,3 +1,5 @@
+from app.core.security import create_access_token
+
 def test_register_success(raw_client):
     response = raw_client.post(
         "/auth/register",
@@ -92,3 +94,36 @@ def test_auth_me_without_token_is_rejected(raw_client):
     response = raw_client.get("/auth/me")
 
     assert response.status_code in [401, 403]
+
+def test_auth_me_rejects_invalid_token(raw_client):
+    response = raw_client.get(
+        "/auth/me",
+        headers={"Authorization": "Bearer invalid.token.value"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+
+
+def test_auth_me_rejects_token_without_subject(raw_client):
+    token = create_access_token(data={"email": "test@example.com"})
+
+    response = raw_client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid token"
+
+
+def test_auth_me_rejects_token_for_missing_user(raw_client):
+    token = create_access_token(data={"sub": "999999"})
+
+    response = raw_client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "User not found"

@@ -13,13 +13,13 @@ from app.schemas.analysis import AnalysisSessionCreate, AnalysisSessionResponse
 from app.routes.dependencies import get_current_user
 from app.models.user import User
 from app.ai.pipeline import run_preprocessing_pipeline
-from app.ai.classify import classify_fusion_vit, resolve_predicted_ids
 from app.ai.scoring import compute_overall_ai_score, compute_body_part_scores
 from app.ai.heatmap import generate_session_heatmaps
 from app.ai.llm_feedback import generate_llm_feedback
 from app.ai.storage import upload_file_to_bucket
 from app.core.config import settings
 from pathlib import Path
+from app.ai.classify import classify_dance, resolve_predicted_ids
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -164,10 +164,10 @@ def upload_analysis_video(
         )
         print("[STEP] preprocessing done")
 
-        classification = classify_fusion_vit(
+        classification = classify_dance(
             skeleton_path=preprocessing_info["model_input_path"],
             video_feature_path=preprocessing_info["video_feature_path"],
-        )
+            )
         print("[STEP] classification done")
 
         predicted_style_id, predicted_move_id = resolve_predicted_ids(
@@ -245,10 +245,6 @@ def upload_analysis_video(
         )
         print("[STEP] heatmaps generated")
 
-        print("SUPABASE_URL =", repr(settings.SUPABASE_URL))
-        print("SUPABASE_VIDEOS_BUCKET =", repr(settings.SUPABASE_VIDEOS_BUCKET))
-        print("SUPABASE_HEATMAPS_BUCKET =", repr(settings.SUPABASE_HEATMAPS_BUCKET))
-        print("SUPABASE_KEY exists =", bool(settings.SUPABASE_KEY))
 
         video_public_url = upload_file_to_bucket(
             local_file_path=saved_path,
